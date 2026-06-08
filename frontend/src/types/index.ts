@@ -27,10 +27,10 @@ export interface School {
 export interface User {
   id: string;
   email: string;
-  username: string;
+  username?: string;
   name?: string;
   role: UserRole;
-  is_active: boolean;
+  is_active?: boolean;
   school?: School | null; // Site admin might have null school
   class_info?: Class;
   section_info?: Section;

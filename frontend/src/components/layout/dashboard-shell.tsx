@@ -20,7 +20,8 @@ export interface DashboardShellProps {
   sidebarFooter?: React.ReactNode;
 }
 
-const roleConfig = {
+const roleConfig: Record<UserRole, { title: string; color: string }> = {
+  site_admin: { title: "Site Admin Dashboard", color: "from-purple-500 to-indigo-600" },
   admin: { title: "Admin Dashboard", color: "from-amber-500 to-orange-600" },
   teacher: { title: "Teacher Dashboard", color: "from-blue-500 to-cyan-600" },
   student: { title: "Student Portal", color: "from-green-500 to-emerald-600" },

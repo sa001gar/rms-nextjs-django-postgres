@@ -222,7 +222,7 @@ export function ClassSubjectsConfig({
             {selectedSubjectIds.size} selected
           </Badge>
           {hasChanges && (
-            <Badge variant="destructive" className="animate-pulse">
+            <Badge variant="danger" className="animate-pulse">
               Unsaved Changes
             </Badge>
           )}

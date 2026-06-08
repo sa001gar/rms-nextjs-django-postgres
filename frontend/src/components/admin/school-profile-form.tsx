@@ -34,8 +34,7 @@ const schoolSchema = z.object({
     .string()
     .min(1, "Prefix is required")
     .max(10, "Prefix too long")
-    .optional()
-    .default("STU"),
+    .optional(),
 });
 
 type SchoolFormValues = z.infer<typeof schoolSchema>;
