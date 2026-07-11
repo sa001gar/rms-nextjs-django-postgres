@@ -62,7 +62,7 @@ export default function ClassesPage() {
   const handleDeleteSection = async (id: string) => {
     if (!confirm('Delete this section?')) return;
     try {
-      await deleteSection.mutateAsync(id);
+      await deleteSection.mutateAsync({ classId: selectedClassId || '', id });
       toast.success('Section deleted');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed');

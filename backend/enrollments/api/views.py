@@ -5,7 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from core.permissions import IsAdmin
-from enrollments.models import Student, Enrollment, ClassTeacher
+from enrollments.models import Student, Enrollment, ClassTeacher, SystemSetting
 from enrollments.api.serializers import (
     StudentSerializer,
     EnrollmentSerializer,
@@ -28,9 +28,20 @@ class StudentViewSet(viewsets.ModelViewSet):
         self._service = StudentService()
 
     def create(self, request, *args, **kwargs):
+        class_id = request.data.get("class_id")
+        session_id = request.data.get("session_id")
+        section_id = request.data.get("section_id")
+        roll_no = request.data.get("roll_no", "")
+
         serializer = StudentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        student = self._service.create(**serializer.validated_data)
+        student = self._service.create(
+            class_id=class_id,
+            session_id=session_id,
+            section_id=section_id,
+            roll_no=roll_no,
+            **serializer.validated_data
+        )
         return Response(StudentSerializer(student).data, status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
@@ -75,6 +86,24 @@ class StudentViewSet(viewsets.ModelViewSet):
     def generate_student_id(self, request, *args, **kwargs):
         student_id = StudentService().generate_student_id()
         return Response({"student_id": student_id})
+
+    @action(detail=False, methods=["get"], url_path="get-id-pattern")
+    def get_id_pattern(self, request, *args, **kwargs):
+        try:
+            setting = SystemSetting.objects.get(key="student_id_pattern")
+            pattern = setting.value
+        except SystemSetting.DoesNotExist:
+            pattern = "STU_{year}_{rand:6}"
+        return Response({"pattern": pattern})
+
+    @action(detail=False, methods=["post"], url_path="set-id-pattern")
+    def set_id_pattern(self, request, *args, **kwargs):
+        pattern = request.data.get("pattern", "STU_{year}_{rand:6}")
+        setting, _ = SystemSetting.objects.update_or_create(
+            key="student_id_pattern",
+            defaults={"value": pattern}
+        )
+        return Response({"pattern": setting.value})
 
 
 class EnrollmentViewSet(viewsets.ModelViewSet):

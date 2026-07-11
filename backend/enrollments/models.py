@@ -10,6 +10,19 @@ from django.utils import timezone
 from shared.base_model import BaseModel
 
 
+class SystemSetting(BaseModel):
+    """General system settings stored in the database."""
+
+    key = models.CharField(max_length=100, unique=True)
+    value = models.TextField()
+
+    class Meta:
+        db_table = "system_settings"
+
+    def __str__(self) -> str:
+        return f"{self.key}: {self.value}"
+
+
 class Student(BaseModel):
     """Student record for the RMS system."""
 
@@ -21,6 +34,7 @@ class Student(BaseModel):
         blank=True,
     )
     student_id = models.CharField(max_length=20, unique=True, editable=False)
+    registration_number = models.CharField(max_length=100, unique=True, null=True, blank=True)
     name = models.CharField(max_length=255)
     date_of_birth = models.DateField()
     father_name = models.CharField(max_length=255, blank=True, default="")
@@ -64,13 +78,47 @@ class Student(BaseModel):
 
     @staticmethod
     def generate_student_id() -> str:
-        year = timezone.now().year
-        chars = string.ascii_uppercase + string.digits
-        while True:
-            suffix = "".join(random.choices(chars, k=6))
-            candidate = f"STU_{year}_{suffix}"
-            if not Student.objects.filter(student_id=candidate).exists():
-                return candidate
+        try:
+            setting = SystemSetting.objects.get(key="student_id_pattern")
+            pattern = setting.value
+        except SystemSetting.DoesNotExist:
+            pattern = "STU_{year}_{rand:6}"
+
+        import re
+        now = timezone.now()
+        student_id = pattern
+
+        # Replace {year}
+        student_id = student_id.replace("{year}", str(now.year))
+        
+        # Replace {month}
+        student_id = student_id.replace("{month}", f"{now.month:02d}")
+
+        # Replace {seq:X} or {seq}
+        seq_matches = re.findall(r"\{seq:?(\d+)?\}", student_id)
+        if seq_matches:
+            next_seq = Student.objects.count() + 1
+            for match in seq_matches:
+                padding = int(match) if match else 4
+                placeholder = f"{{seq:{match}}}" if match else "{seq}"
+                student_id = student_id.replace(placeholder, f"{next_seq:0{padding}d}")
+
+        # Replace {rand:X} or {rand}
+        rand_matches = re.findall(r"\{rand:?(\d+)?\}", student_id)
+        for match in rand_matches:
+            length = int(match) if match else 6
+            placeholder = f"{{rand:{match}}}" if match else "{rand}"
+            chars = string.ascii_uppercase + string.digits
+            random_suffix = "".join(random.choices(chars, k=length))
+            student_id = student_id.replace(placeholder, random_suffix)
+
+        base_id = student_id
+        counter = 1
+        while Student.objects.filter(student_id=student_id).exists():
+            student_id = f"{base_id}_{counter}"
+            counter += 1
+
+        return student_id
 
 
 class Enrollment(BaseModel):

@@ -2,7 +2,8 @@ import { z } from 'zod';
 
 export const studentCreateSchema = z.object({
   name: z.string().min(1, 'Name is required'),
-  student_id: z.string().min(1, 'Student ID is required'),
+  registration_number: z.string().min(1, 'Registration number is required'),
+  date_of_birth: z.string().min(1, 'Date of birth is required'),
   roll_no: z.string().min(1, 'Roll number is required'),
   class_id: z.string().min(1, 'Class is required'),
   section_id: z.string().min(1, 'Section is required'),

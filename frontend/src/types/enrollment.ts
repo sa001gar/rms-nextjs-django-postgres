@@ -1,6 +1,7 @@
 export interface Student {
   id: string;
   student_id: string;
+  registration_number?: string | null;
   roll_no: string;
   name: string;
   date_of_birth?: string | null;

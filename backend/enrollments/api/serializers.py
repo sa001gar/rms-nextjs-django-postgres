@@ -6,11 +6,17 @@ from enrollments.models import Student, Enrollment, ClassTeacher
 
 
 class StudentSerializer(serializers.ModelSerializer):
+    class_info = serializers.SerializerMethodField()
+    section_info = serializers.SerializerMethodField()
+    session_info = serializers.SerializerMethodField()
+    roll_no = serializers.SerializerMethodField()
+
     class Meta:
         model = Student
         fields = [
             "id",
             "student_id",
+            "registration_number",
             "name",
             "date_of_birth",
             "father_name",
@@ -28,8 +34,46 @@ class StudentSerializer(serializers.ModelSerializer):
             "is_active",
             "created_at",
             "updated_at",
+            "class_info",
+            "section_info",
+            "session_info",
+            "roll_no",
         ]
         read_only_fields = ["id", "student_id", "created_at", "updated_at"]
+
+    def get_latest_enrollment(self, obj):
+        if not hasattr(self, "_latest_enrollment_cache"):
+            self._latest_enrollment_cache = {}
+        if obj.id not in self._latest_enrollment_cache:
+            self._latest_enrollment_cache[obj.id] = obj.enrollments.select_related(
+                "class_field", "section", "session"
+            ).order_by("-session__start_date").first()
+        return self._latest_enrollment_cache[obj.id]
+
+    def get_class_info(self, obj):
+        enrollment = self.get_latest_enrollment(obj)
+        if enrollment and enrollment.class_field:
+            return {"id": str(enrollment.class_field.id), "name": enrollment.class_field.name}
+        return None
+
+    def get_section_info(self, obj):
+        enrollment = self.get_latest_enrollment(obj)
+        if enrollment and enrollment.section:
+            return {"id": str(enrollment.section.id), "name": enrollment.section.name}
+        return None
+
+    def get_session_info(self, obj):
+        enrollment = self.get_latest_enrollment(obj)
+        if enrollment and enrollment.session:
+            return {"id": str(enrollment.session.id), "name": enrollment.session.name}
+        return None
+
+    def get_roll_no(self, obj):
+        enrollment = self.get_latest_enrollment(obj)
+        if enrollment:
+            return enrollment.roll_no
+        return ""
+
 
 
 class EnrollmentSerializer(serializers.ModelSerializer):

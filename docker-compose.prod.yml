@@ -37,6 +37,8 @@ services:
       dockerfile: Dockerfile
       target: production
     restart: always
+    ports:
+      - "8000:8000"
     environment:
       SECRET_KEY: ${SECRET_KEY}
       DATABASE_URL: postgresql://${POSTGRES_USER:-rms_user}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-rms_production}
@@ -102,25 +104,12 @@ services:
       dockerfile: Dockerfile
       target: production
     restart: always
+    ports:
+      - "3000:3000"
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     depends_on:
       - backend
-
-  nginx:
-    image: nginx:alpine
-    restart: always
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/ssl:/etc/nginx/ssl:ro
-      - static_files:/app/staticfiles:ro
-      - media_files:/app/media:ro
-    depends_on:
-      - backend
-      - frontend
 
 volumes:
   pgdata:

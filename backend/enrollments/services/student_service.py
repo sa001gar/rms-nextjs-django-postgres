@@ -29,6 +29,11 @@ class StudentService(BaseService):
         password = kwargs.pop("password", "")
         name = kwargs.get("name", "")
 
+        class_id = kwargs.pop("class_id", None)
+        session_id = kwargs.pop("session_id", None)
+        section_id = kwargs.pop("section_id", None)
+        roll_no = kwargs.pop("roll_no", "")
+
         student_id = Student.generate_student_id()
         self.log.info("creating_student", student_id=student_id)
 
@@ -41,11 +46,27 @@ class StudentService(BaseService):
             last_name=" ".join(name.split()[1:]) if name and len(name.split()) > 1 else "",
         )
 
+        if class_id:
+            kwargs["admission_class_id"] = class_id
+        if session_id:
+            kwargs["admission_session_id"] = session_id
+
         student = self.repo.create(user=user, student_id=student_id, **kwargs)
 
         # Set default password from DOB if not provided
         if not password:
             student.set_default_password()
+
+        if class_id and session_id and section_id:
+            from enrollments.models import Enrollment
+            Enrollment.objects.create(
+                student=student,
+                session_id=session_id,
+                class_field_id=class_id,
+                section_id=section_id,
+                roll_no=roll_no,
+                status="active",
+            )
 
         AuditLog.log(
             action="student_created",

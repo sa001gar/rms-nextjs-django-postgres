@@ -35,7 +35,9 @@ else:
     }
 
 # Cache and Celery
-if "REDIS_URL" in os.environ:
+use_redis = os.environ.get("USE_REDIS_IN_DEV", "False").lower() == "true"
+
+if use_redis and "REDIS_URL" in os.environ:
     REDIS_URL = os.environ["REDIS_URL"]
     CACHES = {
         "default": {
@@ -58,6 +60,9 @@ else:
             "OPTIONS": {"MAX_ENTRIES": 1000},
         }
     }
+    CELERY_TASK_ALWAYS_EAGER = True
+    CELERY_TASK_EAGER_PROPAGATES = True
+    CELERY_BROKER_URL = "memory://"
 
 
 # JWT - longer for dev
