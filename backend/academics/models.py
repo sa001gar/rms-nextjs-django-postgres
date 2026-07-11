@@ -217,3 +217,24 @@ class TeacherAssignment(BaseModel):
             f"{self.teacher.name} -> {self.class_ref.name} "
             f"{self.section.name} {self.subject.name}"
         )
+
+
+class MarksDistribution(BaseModel):
+    """Full-marks allocation for each assessment type per class."""
+
+    class_ref = models.ForeignKey(
+        Class, on_delete=models.CASCADE, related_name="marks_distributions", db_column="class_id"
+    )
+    assessment_type = models.ForeignKey(
+        AssessmentType, on_delete=models.CASCADE, related_name="marks_distributions"
+    )
+    full_marks = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        db_table = "marks_distributions"
+        unique_together = [("class_ref", "assessment_type")]
+        ordering = ["class_ref__level", "assessment_type__display_order"]
+
+    def __str__(self) -> str:
+        return f"{self.class_ref.name} - {self.assessment_type.name}: {self.full_marks}"
+

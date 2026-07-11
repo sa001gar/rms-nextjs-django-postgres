@@ -107,6 +107,14 @@ class TermViewSet(viewsets.ViewSet):
         term = Term.objects.get(pk=pk)
         return Response(TermOutputSerializer(term).data)
 
+    def partial_update(self, request, pk=None):
+        from academics.models import Term
+        serializer = TermInputSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        Term.objects.filter(pk=pk).update(**serializer.validated_data)
+        term = Term.objects.get(pk=pk)
+        return Response(TermOutputSerializer(term).data)
+
     def destroy(self, request, pk=None):
         from academics.models import Term
         Term.objects.filter(pk=pk).delete()
@@ -275,6 +283,12 @@ class AssessmentTypeViewSet(viewsets.ViewSet):
         at = self.service.update(pk, **serializer.validated_data)
         return Response(AssessmentTypeOutputSerializer(at).data)
 
+    def partial_update(self, request, pk=None):
+        serializer = AssessmentTypeInputSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        at = self.service.update(pk, **serializer.validated_data)
+        return Response(AssessmentTypeOutputSerializer(at).data)
+
     def destroy(self, request, pk=None):
         self.service.delete(pk)
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -383,3 +397,61 @@ class TeacherAssignmentViewSet(viewsets.ViewSet):
     def destroy(self, request, pk=None):
         self.service.remove_assignment(pk)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class MarksDistributionViewSet(viewsets.ViewSet):
+    """Class-level marks distribution per assessment type."""
+    permission_classes = [IsAdmin]
+
+    def list(self, request):
+        from academics.models import MarksDistribution
+        qs = MarksDistribution.objects.select_related("class_ref", "assessment_type").all()
+        data = [
+            {
+                "id": str(md.id),
+                "class_id": str(md.class_ref_id),
+                "class_name": md.class_ref.name,
+                "assessment_type_id": str(md.assessment_type_id),
+                "assessment_type_name": md.assessment_type.name,
+                "full_marks": md.full_marks,
+            }
+            for md in qs
+        ]
+        return Response(data)
+
+    @action(detail=False, methods=["post"], url_path="bulk-save")
+    def bulk_save(self, request):
+        """Bulk upsert marks distribution entries.
+        
+        Expected payload:
+        {
+          "entries": [
+            {"class_id": "...", "assessment_type_id": "...", "full_marks": 40},
+            ...
+          ]
+        }
+        """
+        from academics.models import MarksDistribution
+        from django.db import transaction
+
+        entries = request.data.get("entries", [])
+        if not entries:
+            return Response({"detail": "No entries provided."}, status=status.HTTP_400_BAD_REQUEST)
+
+        results = []
+        with transaction.atomic():
+            for entry in entries:
+                obj, _ = MarksDistribution.objects.update_or_create(
+                    class_ref_id=entry["class_id"],
+                    assessment_type_id=entry["assessment_type_id"],
+                    defaults={"full_marks": entry.get("full_marks", 0)},
+                )
+                results.append({
+                    "id": str(obj.id),
+                    "class_id": str(obj.class_ref_id),
+                    "assessment_type_id": str(obj.assessment_type_id),
+                    "full_marks": obj.full_marks,
+                })
+
+        return Response(results, status=status.HTTP_200_OK)
+

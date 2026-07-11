@@ -11,6 +11,7 @@ from academics.api.views import (
     GradePolicyViewSet,
     TeacherAssignmentViewSet,
     TermViewSet,
+    MarksDistributionViewSet,
 )
 
 router = DefaultRouter()
@@ -21,6 +22,7 @@ router.register(r"subjects", SubjectViewSet, basename="subjects")
 router.register(r"assessment-types", AssessmentTypeViewSet, basename="assessment-types")
 router.register(r"grade-policies", GradePolicyViewSet, basename="grade-policies")
 router.register(r"teacher-assignments", TeacherAssignmentViewSet, basename="teacher-assignments")
+router.register(r"marks-distribution", MarksDistributionViewSet, basename="marks-distribution")
 
 urlpatterns = [
     path("", include(router.urls)),
