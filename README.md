@@ -1,4 +1,4 @@
-# RMS - Result Management System
+# RMS - Result Management System : By Sagar Kundu
 
 A production-grade Result Management System built with Django 6+ and Next.js 16+.
 
