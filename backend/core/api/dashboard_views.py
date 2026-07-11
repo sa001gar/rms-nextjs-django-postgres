@@ -22,9 +22,9 @@ class AdminDashboardView(APIView):
 
         stats = {
             "total_students": Student.objects.filter(is_active=True).count(),
-            "total_teachers": TeacherProfile.objects.filter(is_active=True).count(),
-            "total_classes": Class.objects.filter(is_active=True).count(),
-            "total_sections": Section.objects.filter(is_active=True).count(),
+            "total_teachers": TeacherProfile.objects.count(),
+            "total_classes": Class.objects.count(),
+            "total_sections": Section.objects.count(),
             "total_sessions": AcademicSession.objects.count(),
             "active_session": {
                 "id": str(active_session.id),
@@ -37,7 +37,7 @@ class AdminDashboardView(APIView):
         # Enrollment stats for active session
         if active_session:
             enrollment_stats = Enrollment.objects.filter(
-                session=active_session, is_active=True
+                session=active_session, status="active"
             ).aggregate(
                 total=Count("id"),
                 promoted=Count("id", filter=Q(status="promoted")),
@@ -48,7 +48,7 @@ class AdminDashboardView(APIView):
 
             # Class-wise student distribution
             class_distribution = (
-                Enrollment.objects.filter(session=active_session, is_active=True)
+                Enrollment.objects.filter(session=active_session, status="active")
                 .values("class_field__name")
                 .annotate(student_count=Count("id"))
                 .order_by("class_field__name")
@@ -75,7 +75,7 @@ class TeacherDashboardView(APIView):
     permission_classes = [IsAuthenticated, IsTeacher]
 
     def get(self, request):
-        from academics.models import TeacherAssignment, AcademicSession, ClassSubject
+        from academics.models import TeacherAssignment, AcademicSession
         from enrollments.models import Enrollment, ClassTeacher
         from results.models import MarksEntry
         from django.db.models import Count
@@ -95,21 +95,19 @@ class TeacherDashboardView(APIView):
             is_active=True,
         ) if active_session else TeacherAssignment.objects.none()
 
-        assigned_subjects = ClassSubject.objects.filter(
-            id__in=assignments.values_list("class_subject_id", flat=True)
-        ).distinct()
-
-        stats["assigned_subjects"] = [
+        assigned_subjects = [
             {
-                "id": str(cs.id),
-                "class_name": cs.class_field.name if cs.class_field else "",
-                "section_name": cs.section.name if cs.section else "",
-                "subject_name": cs.subject.name if cs.subject else "",
+                "id": str(a.id),
+                "class_name": a.class_ref.name if a.class_ref else "",
+                "section_name": a.section.name if a.section else "",
+                "subject_name": a.subject.name if a.subject else "",
             }
-            for cs in assigned_subjects
+            for a in assignments
         ]
 
-        stats["total_assigned_subjects"] = assigned_subjects.count()
+        stats["assigned_subjects"] = assigned_subjects
+
+        stats["total_assigned_subjects"] = len(assigned_subjects)
 
         # Classes where teacher is class teacher
         class_teacher_of = ClassTeacher.objects.filter(
@@ -130,8 +128,8 @@ class TeacherDashboardView(APIView):
         # Marks entered this session
         if active_session:
             marks_count = MarksEntry.objects.filter(
-                created_by=teacher_profile,
-                assessment__class_subject__class_field__enrollments__session=active_session,
+                entered_by=teacher_profile.user,
+                enrollment__session=active_session,
             ).distinct().count()
         else:
             marks_count = 0
@@ -163,7 +161,7 @@ class StudentDashboardView(APIView):
             current_enrollment = Enrollment.objects.filter(
                 student=student,
                 session=active_session,
-                is_active=True,
+                status="active",
             ).select_related("class_field", "section").first()
 
         if current_enrollment:

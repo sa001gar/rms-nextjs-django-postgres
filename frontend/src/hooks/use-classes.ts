@@ -55,7 +55,7 @@ export function useCreateSection() {
 export function useDeleteSection() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => classesApi.deleteSection(id),
+    mutationFn: ({ classId, id }: { classId: string; id: string }) => classesApi.deleteSection(classId, id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.classes }),
   });
 }

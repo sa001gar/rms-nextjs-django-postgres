@@ -16,7 +16,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install Python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+RUN pip install --no-cache-dir uv && uv pip install --system --prefix=/install -r requirements.txt
+
+ENV PATH="/install/bin:$PATH" \
+    PYTHONPATH="/install/lib/python3.14/site-packages:$PYTHONPATH"
 
 # Stage 2: Production image
 FROM python:3.14-slim AS production

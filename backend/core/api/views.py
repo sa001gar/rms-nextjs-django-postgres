@@ -23,13 +23,16 @@ class LoginView(APIView):
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+
         service = AuthService()
         result = service.login(
             email=serializer.validated_data["email"],
             password=serializer.validated_data["password"],
         )
 
-        user = request.user.__class__.objects.get(id=result.user_id)
+        user = User.objects.get(id=result.user_id)
         user_data = UserResponseSerializer(user).data
 
         # Build role-specific profile data
