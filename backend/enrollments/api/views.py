@@ -48,9 +48,22 @@ class StudentViewSet(viewsets.ModelViewSet):
         student = self._service.get_by_id(kwargs["pk"])
         if student is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
+        
+        class_id = request.data.get("class_id")
+        session_id = request.data.get("session_id")
+        section_id = request.data.get("section_id")
+        roll_no = request.data.get("roll_no")
+
         serializer = StudentSerializer(data=request.data, partial=kwargs.get("partial", False))
         serializer.is_valid(raise_exception=True)
-        updated = self._service.update(student.id, **serializer.validated_data)
+        updated = self._service.update(
+            student.id,
+            class_id=class_id,
+            session_id=session_id,
+            section_id=section_id,
+            roll_no=roll_no,
+            **serializer.validated_data
+        )
         return Response(StudentSerializer(updated).data)
 
     def partial_update(self, request, *args, **kwargs):
@@ -118,7 +131,14 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         serializer = EnrollmentCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        enrollment = self._service.enroll(**serializer.validated_data)
+        data = serializer.validated_data
+        enrollment = self._service.enroll(
+            student_id=data["student"],
+            session_id=data["session"],
+            class_id=data["class_field"],
+            section_id=data["section"],
+            roll_no=data.get("roll_no", "")
+        )
         return Response(EnrollmentSerializer(enrollment).data, status=status.HTTP_201_CREATED)
 
     def list(self, request, *args, **kwargs):
@@ -172,7 +192,14 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
     def bulk_enroll(self, request, *args, **kwargs):
         serializer = EnrollmentBulkCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        enrollments = self._service.bulk_enroll(**serializer.validated_data)
+        data = serializer.validated_data
+        enrollments = self._service.bulk_enroll(
+            student_ids=data["student_ids"],
+            session_id=data["session"],
+            class_id=data["class_field"],
+            section_id=data["section"],
+            roll_nos=data.get("roll_nos", {}),
+        )
         return Response(
             EnrollmentSerializer(enrollments, many=True).data,
             status=status.HTTP_201_CREATED,
@@ -205,7 +232,13 @@ class ClassTeacherViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         serializer = ClassTeacherSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        ct = self._service.assign(**serializer.validated_data)
+        data = serializer.validated_data
+        ct = self._service.assign(
+            teacher_id=data["teacher"].id if hasattr(data["teacher"], "id") else data["teacher"],
+            class_id=data["class_field"].id if hasattr(data["class_field"], "id") else data["class_field"],
+            section_id=data["section"].id if hasattr(data["section"], "id") else data["section"],
+            session_id=data["session"].id if hasattr(data["session"], "id") else data["session"],
+        )
         return Response(ClassTeacherSerializer(ct).data, status=status.HTTP_201_CREATED)
 
     def destroy(self, request, *args, **kwargs):

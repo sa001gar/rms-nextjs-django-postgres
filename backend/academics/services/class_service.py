@@ -32,7 +32,10 @@ class ClassService(BaseService):
             if existing:
                 raise ConflictException(f"Class '{kwargs['name']}' already exists.")
         self.log.info("class.update", class_id=str(class_id))
-        return self.repo.update(class_id, **kwargs)
+        updated_class = self.repo.update(class_id, **kwargs)
+        if updated_class is None:
+            raise NotFoundException("Class not found.")
+        return updated_class
 
     def delete(self, class_id: UUID) -> bool:
         self.repo.get_by_id_or_raise(class_id, "Class not found.")

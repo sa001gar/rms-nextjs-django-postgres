@@ -32,7 +32,7 @@ const CATEGORY_OPTIONS = [
 const typeSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   code: z.string().min(1, 'Code is required'),
-  category_type: z.string().min(1, 'Category is required'),
+  category: z.string().min(1, 'Category is required'),
   display_order: z.number().int('Must be a whole number').min(0, 'Min is 0'),
   is_active: z.boolean(),
 });
@@ -90,7 +90,7 @@ function AssessmentTypesTab() {
     defaultValues: {
       name: '',
       code: '',
-      category_type: '',
+      category: '',
       display_order: 0,
       is_active: true,
     },
@@ -114,7 +114,7 @@ function AssessmentTypesTab() {
 
   const openAddModal = () => {
     setEditingId(null);
-    reset({ name: '', code: '', category_type: '', display_order: 0, is_active: true });
+    reset({ name: '', code: '', category: '', display_order: 0, is_active: true });
     setModalOpen(true);
   };
 
@@ -123,7 +123,7 @@ function AssessmentTypesTab() {
     reset({
       name: record.name,
       code: record.code,
-      category_type: record.category_type,
+      category: record.category,
       display_order: record.display_order ?? 0,
       is_active: record.is_active,
     });
@@ -203,7 +203,7 @@ function AssessmentTypesTab() {
                   <TableCell className="font-medium">{record.name}</TableCell>
                   <TableCell>{record.code}</TableCell>
                   <TableCell>
-                    <Badge variant="secondary">{record.category_type || '-'}</Badge>
+                    <Badge variant="secondary">{record.category || '-'}</Badge>
                   </TableCell>
                   <TableCell>{record.display_order ?? 0}</TableCell>
                   <TableCell>
@@ -251,16 +251,16 @@ function AssessmentTypesTab() {
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Category</label>
             <select
               className="flex h-10 w-full appearance-none rounded-lg border border-gray-300 bg-white px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 disabled:cursor-not-allowed disabled:opacity-50"
-              value={watch('category_type')}
-              onChange={(e) => setValue('category_type', e.target.value, { shouldValidate: true })}
+              value={watch('category')}
+              onChange={(e) => setValue('category', e.target.value, { shouldValidate: true })}
             >
               <option value="" disabled>Select category</option>
               {CATEGORY_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
-            {errors.category_type?.message && (
-              <p className="mt-1.5 text-sm text-red-600">{errors.category_type.message}</p>
+            {errors.category?.message && (
+              <p className="mt-1.5 text-sm text-red-600">{errors.category.message}</p>
             )}
           </div>
           <Input
@@ -311,7 +311,6 @@ function WeightageConfigTab() {
   const [assessmentTypes, setAssessmentTypes] = useState<AssessmentCategory[]>([]);
 
   const [selectedClassId, setSelectedClassId] = useState('');
-  const [selectedSectionId, setSelectedSectionId] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
 
   const [weightages, setWeightages] = useState<Record<string, { full_marks: number; weightage: number }>>({});
@@ -320,22 +319,15 @@ function WeightageConfigTab() {
 
   useEffect(() => {
     classesApi.getAll().then(setClasses).catch(() => toast.error('Failed to load classes'));
+    subjectsApi.getAll().then(setSubjects).catch(() => toast.error('Failed to load subjects'));
     assessmentsApi.getCategories().then(setAssessmentTypes).catch(() => toast.error('Failed to load assessment types'));
   }, []);
 
   useEffect(() => {
     if (!selectedClassId) {
-      setSections([]);
-      setSubjects([]);
-      setSelectedSectionId('');
       setSelectedSubjectId('');
       return;
     }
-    classesApi.getSections(selectedClassId).then(setSections).catch(() => toast.error('Failed to load sections'));
-    subjectsApi.getAssignments(selectedClassId).then((assignments) => {
-      setSubjects(assignments.map((a) => a.subject));
-    }).catch(() => toast.error('Failed to load subjects'));
-    setSelectedSectionId('');
     setSelectedSubjectId('');
     setWeightages({});
   }, [selectedClassId]);
@@ -382,7 +374,7 @@ function WeightageConfigTab() {
         .map((t) => ({
           assessment_type_id: t.id,
           full_marks: weightages[t.id].full_marks,
-          weightage: weightages[t.id].weightage,
+          weightage_pct: weightages[t.id].weightage,
         }));
       await assessmentsApi.setWeightage({
         class_id: selectedClassId,
@@ -407,7 +399,7 @@ function WeightageConfigTab() {
         <CardTitle>Weightage Configuration</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 max-w-2xl">
           <Select
             label="Class"
             placeholder="Select class"
@@ -416,20 +408,18 @@ function WeightageConfigTab() {
             onChange={(e) => setSelectedClassId(e.target.value)}
           />
           <Select
-            label="Section"
-            placeholder="Select section"
-            options={sectionOptions}
-            value={selectedSectionId}
-            onChange={(e) => setSelectedSectionId(e.target.value)}
-            disabled={!selectedClassId}
-          />
-          <Select
             label="Subject"
-            placeholder="Select subject"
+            placeholder={
+              !selectedClassId 
+                ? "Select a class first" 
+                : subjectOptions.length === 0 
+                ? "No subjects found" 
+                : "Select subject"
+            }
             options={subjectOptions}
             value={selectedSubjectId}
             onChange={(e) => setSelectedSubjectId(e.target.value)}
-            disabled={!selectedClassId}
+            disabled={!selectedClassId || subjectOptions.length === 0}
           />
         </div>
 
@@ -461,7 +451,7 @@ function WeightageConfigTab() {
                   <TableRow key={type.id}>
                     <TableCell className="font-medium">{type.name}</TableCell>
                     <TableCell>
-                      <Badge variant="secondary">{type.category_type || '-'}</Badge>
+                      <Badge variant="secondary">{type.category || '-'}</Badge>
                     </TableCell>
                     <TableCell>
                       <Input

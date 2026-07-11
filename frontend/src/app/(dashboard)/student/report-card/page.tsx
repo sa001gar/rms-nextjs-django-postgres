@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Select, SelectOption } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { BoneyardCard } from '@/components/ui/boneyard';
 import { Download, Printer, Loader2 } from 'lucide-react';
 
 export default function StudentReportCardPage() {
@@ -57,9 +58,7 @@ export default function StudentReportCardPage() {
     return (
       <div className="space-y-6">
         <PageHeader title="Report Card" description="Loading report card..." />
-        <div className="flex items-center justify-center p-12">
-          <Loader2 className="h-8 w-8 animate-spin text-amber-600" />
-        </div>
+        <BoneyardCard lines={10} />
       </div>
     );
   }

@@ -186,6 +186,19 @@ class SubjectViewSet(viewsets.ViewSet):
         data = [ClassSubjectOutputSerializer(cs).data for cs in cs_list]
         return Response(data)
 
+    @action(detail=False, methods=["post"], url_path="unassign-from-class")
+    def unassign_from_class(self, request):
+        class_id = request.data.get("class_id")
+        subject_id = request.data.get("subject_id")
+        if not class_id or not subject_id:
+            return Response(
+                {"detail": "class_id and subject_id are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        from academics.models import ClassSubject
+        ClassSubject.objects.filter(class_ref_id=class_id, subject_id=subject_id).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class AssessmentTypeViewSet(viewsets.ViewSet):
     permission_classes = [IsAdmin]

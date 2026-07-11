@@ -15,13 +15,8 @@ import { Plus, Pencil, Trash2 } from 'lucide-react';
 import api from '@/lib/api/client';
 import type { GradePolicy } from '@/types/academic';
 
-interface GradePolicyExtended extends GradePolicy {
-  grade_point: number;
-  display_order: number;
-}
-
 const gradeSchema = z.object({
-  grade: z.string().min(1, 'Grade label is required'),
+  grade_label: z.string().min(1, 'Grade label is required'),
   min_percentage: z.coerce
     .number()
     .min(0, 'Min must be at least 0')
@@ -45,12 +40,12 @@ const gradeSchema = z.object({
 type GradeFormData = z.infer<typeof gradeSchema>;
 
 export function GradingConfig() {
-  const [policies, setPolicies] = useState<GradePolicyExtended[]>([]);
+  const [policies, setPolicies] = useState<GradePolicy[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<GradePolicyExtended | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<GradePolicy | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const {
@@ -61,7 +56,7 @@ export function GradingConfig() {
   } = useForm<GradeFormData>({
     resolver: zodResolver(gradeSchema) as any,
     defaultValues: {
-      grade: '',
+      grade_label: '',
       min_percentage: 0,
       max_percentage: 100,
       grade_point: 0,
@@ -73,7 +68,7 @@ export function GradingConfig() {
     try {
       setLoading(true);
       setError(null);
-      const data = await api.get<GradePolicyExtended[]>('/academic/grade-policies/');
+      const data = await api.get<GradePolicy[]>('/academics/grade-policies/');
       setPolicies(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load grade policies');
@@ -88,14 +83,14 @@ export function GradingConfig() {
 
   const openAddModal = () => {
     setEditingId(null);
-    reset({ grade: '', min_percentage: 0, max_percentage: 100, grade_point: 0, display_order: 0 });
+    reset({ grade_label: '', min_percentage: 0, max_percentage: 100, grade_point: 0, display_order: 0 });
     setModalOpen(true);
   };
 
-  const openEditModal = (policy: GradePolicyExtended) => {
+  const openEditModal = (policy: GradePolicy) => {
     setEditingId(policy.id);
     reset({
-      grade: policy.grade,
+      grade_label: policy.grade_label,
       min_percentage: policy.min_percentage,
       max_percentage: policy.max_percentage,
       grade_point: policy.grade_point,
@@ -108,9 +103,9 @@ export function GradingConfig() {
     try {
       setSubmitting(true);
       if (editingId) {
-        await api.put(`/academic/grade-policies/${editingId}/`, data);
+        await api.put(`/academics/grade-policies/${editingId}/`, data);
       } else {
-        await api.post('/academic/grade-policies/', data);
+        await api.post('/academics/grade-policies/', data);
       }
       setModalOpen(false);
       await fetchPolicies();
@@ -124,7 +119,7 @@ export function GradingConfig() {
   const handleDelete = async () => {
     if (!deleteTarget) return;
     try {
-      await api.delete(`/academic/grade-policies/${deleteTarget.id}/`);
+      await api.delete(`/academics/grade-policies/${deleteTarget.id}/`);
       setDeleteTarget(null);
       await fetchPolicies();
     } catch (err) {
@@ -188,7 +183,7 @@ export function GradingConfig() {
               <TableBody>
                 {sortedPolicies.map((policy) => (
                   <TableRow key={policy.id}>
-                    <TableCell className="font-medium">{policy.grade}</TableCell>
+                    <TableCell className="font-medium">{policy.grade_label}</TableCell>
                     <TableCell>{policy.min_percentage}%</TableCell>
                     <TableCell>{policy.max_percentage}%</TableCell>
                     <TableCell>{policy.grade_point}</TableCell>
@@ -229,8 +224,8 @@ export function GradingConfig() {
           <Input
             label="Grade Label"
             placeholder="e.g., A+"
-            error={errors.grade?.message}
-            {...register('grade')}
+            error={errors.grade_label?.message}
+            {...register('grade_label')}
           />
           <div className="grid grid-cols-2 gap-4">
             <Input
@@ -286,7 +281,7 @@ export function GradingConfig() {
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
         title="Delete Grade Policy"
-        message={`Are you sure you want to delete grade "${deleteTarget?.grade}"? This action cannot be undone.`}
+        message={`Are you sure you want to delete grade "${deleteTarget?.grade_label}"? This action cannot be undone.`}
         confirmLabel="Delete"
       />
     </div>

@@ -43,10 +43,18 @@ export function useSubjectAssignments(classId: string) {
   });
 }
 
-export function useBulkAssignSubjects() {
+export function useAssignSubject() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: { class_id: string; subject_ids: string[] }) => subjectsApi.bulkAssignToClass(data),
+    mutationFn: (data: { class_id: string; subject_id: string; is_required?: boolean; full_marks?: number }) => subjectsApi.assignToClass(data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['subject-assignments'] }),
+  });
+}
+
+export function useUnassignSubject() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { class_id: string; subject_id: string }) => subjectsApi.unassignFromClass(data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['subject-assignments'] }),
   });
 }

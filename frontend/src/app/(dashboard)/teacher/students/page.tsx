@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSessions } from '@/hooks/use-sessions';
-import { useClasses } from '@/hooks/use-classes';
+import { useClasses, useSections } from '@/hooks/use-classes';
 import { PageHeader } from '@/components/layout/page-header';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -67,7 +67,7 @@ export default function TeacherStudentsPage() {
 
   const enrollments: Enrollment[] = (enrollmentsData as any)?.results || enrollmentsData || [];
 
-  const sections = classes.find((c: any) => c.id === selectedClass)?.sections || [];
+  const { data: sections = [] } = useSections(selectedClass);
 
   const handleViewStudent = async (enrollment: Enrollment) => {
     setSelectedStudent(enrollment);

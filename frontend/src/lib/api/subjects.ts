@@ -22,7 +22,10 @@ export const subjectsApi = {
     const response = await api.get<{ results?: Array<{ id: string; class_id: string; subject: Subject; is_required: boolean }> }>('/academics/subjects/class-subjects/', { class_id: classId });
     return Array.isArray(response) ? response : (response.results || []);
   },
-  bulkAssignToClass: async (data: { class_id: string; subject_ids: string[] }): Promise<void> => {
+  assignToClass: async (data: { class_id: string; subject_id: string; is_required?: boolean; full_marks?: number }): Promise<void> => {
     await api.post('/academics/subjects/assign-to-class/', data);
+  },
+  unassignFromClass: async (data: { class_id: string; subject_id: string }): Promise<void> => {
+    await api.post('/academics/subjects/unassign-from-class/', data);
   },
 };

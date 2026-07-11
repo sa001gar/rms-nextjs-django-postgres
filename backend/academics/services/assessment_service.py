@@ -48,6 +48,11 @@ class AssessmentService(BaseService):
         self.log.info("assessment_type.update", id=str(assessment_type_id))
         return self.repo.update(assessment_type_id, **kwargs)
 
+    def delete(self, assessment_type_id: UUID) -> bool:
+        self.repo.get_by_id_or_raise(assessment_type_id, "Assessment type not found.")
+        self.log.info("assessment_type.delete", id=str(assessment_type_id))
+        return self.repo.delete(assessment_type_id)
+
     def list_active(self) -> QuerySet[AssessmentType]:
         return AssessmentType.objects.filter(is_active=True).order_by("display_order")
 
@@ -60,7 +65,7 @@ class AssessmentService(BaseService):
         weightage_pct: float,
     ) -> AssessmentWeightage:
         existing = AssessmentWeightage.objects.filter(
-            class_id=class_id,
+            class_ref_id=class_id,
             subject_id=subject_id,
             assessment_type_id=assessment_type_id,
         ).first()
@@ -80,7 +85,7 @@ class AssessmentService(BaseService):
             subject_id=str(subject_id),
         )
         return AssessmentWeightage.objects.create(
-            class_id=class_id,
+            class_ref_id=class_id,
             subject_id=subject_id,
             assessment_type_id=assessment_type_id,
             full_marks=full_marks,
@@ -91,5 +96,5 @@ class AssessmentService(BaseService):
         self, class_id: UUID, subject_id: UUID
     ) -> QuerySet[AssessmentWeightage]:
         return AssessmentWeightage.objects.filter(
-            class_id=class_id, subject_id=subject_id
+            class_ref_id=class_id, subject_id=subject_id
         ).select_related("assessment_type")

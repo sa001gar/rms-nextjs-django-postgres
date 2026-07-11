@@ -37,7 +37,7 @@ class AssignmentService(BaseService):
         )
         return self.repo.create(
             teacher_id=teacher_id,
-            class_id=class_id,
+            class_ref_id=class_id,
             section_id=section_id,
             subject_id=subject_id,
             session_id=session_id,
@@ -69,5 +69,5 @@ class AssignmentService(BaseService):
         self, class_id: UUID, session_id: UUID
     ) -> QuerySet[TeacherAssignment]:
         return TeacherAssignment.objects.filter(
-            class_id=class_id, session_id=session_id, is_active=True
+            class_ref_id=class_id, session_id=session_id, is_active=True
         ).select_related("teacher", "section", "subject")

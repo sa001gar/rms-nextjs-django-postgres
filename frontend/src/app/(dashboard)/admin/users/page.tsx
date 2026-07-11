@@ -17,6 +17,7 @@ import {
   TableHead,
   TableCell,
 } from '@/components/ui/table';
+import { BoneyardTable } from '@/components/ui/boneyard';
 
 type RoleFilter = 'all' | 'admin' | 'teacher' | 'student';
 
@@ -264,9 +265,8 @@ export default function AdminUsersPage() {
 
       {/* Table */}
       {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="h-6 w-6 animate-spin text-amber-600" />
-          <span className="ml-2 text-sm text-gray-500">Loading users...</span>
+        <div className="py-4">
+          <BoneyardTable rows={5} cols={5} />
         </div>
       ) : filteredUsers.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-gray-300 py-16">

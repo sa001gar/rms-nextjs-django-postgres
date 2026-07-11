@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useStudents, useCreateStudent, useDeleteStudent } from '@/hooks/use-students';
+import { useStudents, useCreateStudent, useDeleteStudent, useUpdateStudent } from '@/hooks/use-students';
 import { useClasses, useSections } from '@/hooks/use-classes';
 import { useSessions } from '@/hooks/use-sessions';
 import { PageHeader } from '@/components/layout/page-header';
@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Loading } from '@/components/ui/loading';
-import { Users, Plus, Trash2, Settings } from 'lucide-react';
+import { Users, Plus, Trash2, Settings, Pencil } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { studentCreateSchema, type StudentCreateFormData } from '@/lib/validators/student';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -25,8 +25,10 @@ export default function StudentsPage() {
   const { data: classes = [] } = useClasses();
   const { data: sessions = [] } = useSessions();
   const createStudent = useCreateStudent();
+  const updateStudent = useUpdateStudent();
   const deleteStudent = useDeleteStudent();
   
+  const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [pattern, setPattern] = useState('');
@@ -60,11 +62,34 @@ export default function StudentsPage() {
     }
   };
 
+  const handleEdit = (student: any) => {
+    setSelectedStudent(student);
+    reset({
+      name: student.name,
+      registration_number: student.registration_number,
+      date_of_birth: student.date_of_birth,
+      roll_no: student.roll_no,
+      session_id: student.session_info?.id,
+      class_id: student.class_info?.id,
+      section_id: student.section_info?.id,
+      phone: student.phone,
+      father_name: student.father_name,
+      mother_name: student.mother_name,
+    });
+    setIsModalOpen(true);
+  };
+
   const onSubmit = async (data: StudentCreateFormData) => {
     try {
-      await createStudent.mutateAsync(data);
-      toast.success('Student created');
+      if (selectedStudent) {
+        await updateStudent.mutateAsync({ id: selectedStudent.id, data });
+        toast.success('Student updated');
+      } else {
+        await createStudent.mutateAsync(data);
+        toast.success('Student created');
+      }
       setIsModalOpen(false);
+      setSelectedStudent(null);
       reset();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed');
@@ -95,7 +120,7 @@ export default function StudentsPage() {
             <Button onClick={() => setSettingsOpen(true)} variant="outline">
               <Settings className="h-4 w-4 mr-2" /> ID Pattern
             </Button>
-            <Button onClick={() => setIsModalOpen(true)}>
+            <Button onClick={() => { setSelectedStudent(null); reset(); setIsModalOpen(true); }}>
               <Plus className="h-4 w-4 mr-2" /> New Student
             </Button>
           </div>
@@ -116,7 +141,7 @@ export default function StudentsPage() {
         />
       </div>
       {students.length === 0 ? (
-        <EmptyState icon={Users} title="No students" description="Add your first student" action={{ label: 'New Student', onClick: () => setIsModalOpen(true) }} />
+        <EmptyState icon={Users} title="No students" description="Add your first student" action={{ label: 'New Student', onClick: () => { setSelectedStudent(null); reset(); setIsModalOpen(true); } }} />
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
           <Table>
@@ -124,7 +149,6 @@ export default function StudentsPage() {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Registration No</TableHead>
-                <TableHead>Student ID</TableHead>
                 <TableHead>Roll No</TableHead>
                 <TableHead>Class</TableHead>
                 <TableHead className="w-20">Actions</TableHead>
@@ -135,13 +159,17 @@ export default function StudentsPage() {
                 <TableRow key={s.id}>
                   <TableCell className="font-medium">{s.name}</TableCell>
                   <TableCell>{s.registration_number || '-'}</TableCell>
-                  <TableCell>{s.student_id}</TableCell>
                   <TableCell>{s.roll_no}</TableCell>
                   <TableCell>{s.class_info?.name || '-'}</TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="icon-sm" onClick={() => handleDelete(s.id)} className="text-red-500">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button variant="ghost" size="icon-sm" onClick={() => handleEdit(s)} className="text-blue-500">
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon-sm" onClick={() => handleDelete(s.id)} className="text-red-500">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -150,7 +178,7 @@ export default function StudentsPage() {
         </div>
       )}
       
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="New Student" size="lg">
+      <Modal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); setSelectedStudent(null); reset(); }} title={selectedStudent ? "Edit Student" : "New Student"} size="lg">
         <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <Input label="Full Name" error={errors.name?.message} {...register('name')} />
@@ -179,8 +207,8 @@ export default function StudentsPage() {
             <Input label="Mother's Name" {...register('mother_name')} />
           </div>
           <div className="flex justify-end gap-3 pt-4">
-            <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-            <Button type="submit" isLoading={createStudent.isPending}>Create Student</Button>
+            <Button type="button" variant="outline" onClick={() => { setIsModalOpen(false); setSelectedStudent(null); reset(); }}>Cancel</Button>
+            <Button type="submit" isLoading={selectedStudent ? updateStudent.isPending : createStudent.isPending}>{selectedStudent ? "Update Student" : "Create Student"}</Button>
           </div>
         </form>
       </Modal>

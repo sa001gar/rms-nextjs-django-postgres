@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { useClasses, useCreateClass, useDeleteClass, useCreateSection, useDeleteSection, useSections } from '@/hooks/use-classes';
+import { useSubjects, useSubjectAssignments, useAssignSubject, useUnassignSubject } from '@/hooks/use-subjects';
+import { Select } from '@/components/ui/select';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -102,26 +104,29 @@ export default function ClassesPage() {
         </div>
       )}
       {selectedClassId && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h3 className="font-semibold text-gray-900 mb-4">Sections</h3>
-          <div className="flex gap-2 mb-4">
-            <Input placeholder="Section name" {...sectionForm.register('name')} className="flex-1" />
-            <Button onClick={sectionForm.handleSubmit(onCreateSection)} isLoading={createSection.isPending}>Add</Button>
-          </div>
-          {sections.length === 0 ? (
-            <p className="text-sm text-gray-500">No sections yet</p>
-          ) : (
-            <div className="space-y-2">
-              {sections.map((s) => (
-                <div key={s.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <span className="text-sm font-medium">{s.name}</span>
-                  <Button variant="ghost" size="icon-sm" onClick={() => handleDeleteSection(s.id)} className="text-red-500">
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </div>
-              ))}
+        <div className="grid gap-6 md:grid-cols-2">
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <h3 className="font-semibold text-gray-900 mb-4">Sections</h3>
+            <div className="flex gap-2 mb-4">
+              <Input placeholder="Section name" {...sectionForm.register('name')} className="flex-1" />
+              <Button onClick={sectionForm.handleSubmit(onCreateSection)} isLoading={createSection.isPending}>Add</Button>
             </div>
-          )}
+            {sections.length === 0 ? (
+              <p className="text-sm text-gray-500">No sections yet</p>
+            ) : (
+              <div className="space-y-2">
+                {sections.map((s) => (
+                  <div key={s.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <span className="text-sm font-medium">{s.name}</span>
+                    <Button variant="ghost" size="icon-sm" onClick={() => handleDeleteSection(s.id)} className="text-red-500">
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <SubjectsSection classId={selectedClassId} />
         </div>
       )}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="New Class" size="md">
@@ -134,6 +139,84 @@ export default function ClassesPage() {
           </div>
         </form>
       </Modal>
+    </div>
+  );
+}
+
+function SubjectsSection({ classId }: { classId: string }) {
+  const { data: allSubjects = [] } = useSubjects();
+  const { data: assignedSubjects = [], isLoading } = useSubjectAssignments(classId);
+  const assignSubject = useAssignSubject();
+  const unassignSubject = useUnassignSubject();
+  const [selectedSubjectId, setSelectedSubjectId] = useState('');
+
+  const handleAssign = async () => {
+    if (!selectedSubjectId) return;
+    try {
+      await assignSubject.mutateAsync({ class_id: classId, subject_id: selectedSubjectId });
+      toast.success('Subject assigned');
+      setSelectedSubjectId('');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to assign subject');
+    }
+  };
+
+  const handleUnassign = async (subjectId: string) => {
+    if (!confirm('Unassign this subject from the class?')) return;
+    try {
+      await unassignSubject.mutateAsync({ class_id: classId, subject_id: subjectId });
+      toast.success('Subject unassigned');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to unassign subject');
+    }
+  };
+
+  const assignedIds = new Set(assignedSubjects.map(s => s.subject?.id));
+  const availableSubjects = allSubjects.filter(s => !assignedIds.has(s.id));
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-6">
+      <h3 className="font-semibold text-gray-900 mb-4">Assigned Subjects</h3>
+      <div className="flex gap-2 mb-4 items-end">
+        <div className="flex-1">
+          <Select
+            placeholder={availableSubjects.length === 0 ? "All subjects assigned" : "Select subject to assign"}
+            options={availableSubjects.map(s => ({ value: s.id, label: `${s.code} - ${s.name}` }))}
+            value={selectedSubjectId}
+            onChange={(e) => setSelectedSubjectId(e.target.value)}
+            disabled={availableSubjects.length === 0 || assignSubject.isPending}
+          />
+        </div>
+        <Button 
+          onClick={handleAssign} 
+          isLoading={assignSubject.isPending} 
+          disabled={!selectedSubjectId}
+        >
+          Assign
+        </Button>
+      </div>
+      {isLoading ? (
+        <div className="py-6 text-center text-sm text-gray-500">Loading subjects...</div>
+      ) : assignedSubjects.length === 0 ? (
+        <p className="text-sm text-gray-500">No subjects assigned yet</p>
+      ) : (
+        <div className="space-y-2">
+          {assignedSubjects.map((s) => (
+            <div key={s.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <span className="text-sm font-medium">{s.subject ? `${s.subject.code} - ${s.subject.name}` : 'Unknown Subject'}</span>
+              <Button 
+                variant="ghost" 
+                size="icon-sm" 
+                onClick={() => handleUnassign(s.subject_id)} 
+                className="text-red-500"
+                isLoading={unassignSubject.isPending}
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

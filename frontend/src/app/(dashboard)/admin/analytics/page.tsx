@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import {
   useSessions,
 } from '@/hooks/use-sessions';
+import { Loading } from '@/components/ui/loading';
 import {
   usePassFailRatio,
   useSubjectDifficulty,
@@ -44,11 +45,7 @@ const GRADE_LABELS: Record<string, string> = {
 };
 
 function LoadingSpinner() {
-  return (
-    <div className="flex items-center justify-center py-12">
-      <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" />
-    </div>
-  );
+  return <Loading message="Loading analytics..." />;
 }
 
 function EmptyState({ message }: { message: string }) {

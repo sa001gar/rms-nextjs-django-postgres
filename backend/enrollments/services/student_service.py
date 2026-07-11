@@ -80,6 +80,11 @@ class StudentService(BaseService):
 
     @transaction.atomic
     def update(self, student_id: UUID, **kwargs) -> Student | None:
+        class_id = kwargs.pop("class_id", None)
+        session_id = kwargs.pop("session_id", None)
+        section_id = kwargs.pop("section_id", None)
+        roll_no = kwargs.pop("roll_no", None)
+
         self.log.info("updating_student", student_id=student_id)
         student = self.repo.get_by_id(student_id)
         if not student:
@@ -91,6 +96,25 @@ class StudentService(BaseService):
             user_profile.save(update_fields=["email"])
         updated_student = self.repo.update(student_id, **kwargs)
         if updated_student:
+            if class_id or session_id or section_id or roll_no is not None:
+                from enrollments.models import Enrollment
+                enrollment = Enrollment.objects.filter(student=updated_student).order_by("-created_at").first()
+                if enrollment:
+                    if class_id: enrollment.class_field_id = class_id
+                    if session_id: enrollment.session_id = session_id
+                    if section_id: enrollment.section_id = section_id
+                    if roll_no is not None: enrollment.roll_no = roll_no
+                    enrollment.save()
+                elif class_id and session_id and section_id:
+                    Enrollment.objects.create(
+                        student=updated_student,
+                        session_id=session_id,
+                        class_field_id=class_id,
+                        section_id=section_id,
+                        roll_no=roll_no or "",
+                        status="active",
+                    )
+            
             AuditLog.log(
                 action="student_updated",
                 user=student.user,

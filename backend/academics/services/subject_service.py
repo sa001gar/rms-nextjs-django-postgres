@@ -66,7 +66,7 @@ class SubjectService(BaseService):
         full_marks: int = 100,
     ) -> ClassSubject:
         existing = ClassSubject.objects.filter(
-            class_id=class_id, subject_id=subject_id
+            class_ref_id=class_id, subject_id=subject_id
         ).first()
         if existing:
             raise ConflictException(
@@ -76,14 +76,14 @@ class SubjectService(BaseService):
             "class_subject.assign", class_id=str(class_id), subject_id=str(subject_id)
         )
         return ClassSubject.objects.create(
-            class_id=class_id,
+            class_ref_id=class_id,
             subject_id=subject_id,
             is_required=is_required,
             full_marks=full_marks,
         )
 
     def list_class_subjects(self, class_id: UUID) -> QuerySet[ClassSubject]:
-        return ClassSubject.objects.filter(class_id=class_id).select_related("subject")
+        return ClassSubject.objects.filter(class_ref_id=class_id).select_related("subject")
 
     def list_by_type(self, subject_type: str) -> QuerySet[Subject]:
         return self.repo.list_by_type(subject_type)

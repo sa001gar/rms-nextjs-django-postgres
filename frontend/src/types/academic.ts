@@ -65,7 +65,9 @@ export interface GradePolicy {
   id: string;
   min_percentage: number;
   max_percentage: number;
-  grade: string;
-  description?: string;
+  grade_label: string;
+  grade_point: number;
+  display_order: number;
+  is_active: boolean;
   created_at: string;
 }

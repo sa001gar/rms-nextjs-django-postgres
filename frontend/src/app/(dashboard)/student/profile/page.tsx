@@ -20,6 +20,7 @@ import {
   Key,
   Loader2,
 } from 'lucide-react';
+import { BoneyardProfile, BoneyardTable } from '@/components/ui/boneyard';
 
 interface StudentProfile {
   id: string;
@@ -143,9 +144,7 @@ export default function StudentProfilePage() {
     return (
       <div className="space-y-6">
         <PageHeader title="My Profile" description="Loading profile..." />
-        <div className="flex items-center justify-center p-12">
-          <Loader2 className="h-8 w-8 animate-spin text-amber-600" />
-        </div>
+        <BoneyardProfile />
       </div>
     );
   }
@@ -266,8 +265,8 @@ export default function StudentProfilePage() {
         </CardHeader>
         <CardContent>
           {enrollmentLoading ? (
-            <div className="flex items-center justify-center p-6">
-              <Loader2 className="h-6 w-6 animate-spin text-amber-600" />
+            <div className="p-4">
+              <BoneyardTable rows={3} cols={5} />
             </div>
           ) : enrollmentHistory.length === 0 ? (
             <p className="text-center text-gray-500 py-4">No enrollment history available.</p>

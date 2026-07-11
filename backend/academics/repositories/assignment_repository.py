@@ -31,7 +31,7 @@ class AssignmentRepository(BaseRepository[TeacherAssignment]):
     ) -> bool:
         qs = TeacherAssignment.objects.filter(
             teacher_id=teacher_id,
-            class_id=class_id,
+            class_ref_id=class_id,
             section_id=section_id,
             subject_id=subject_id,
             session_id=session_id,

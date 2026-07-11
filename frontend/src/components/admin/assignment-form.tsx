@@ -18,7 +18,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Loading } from '@/components/ui/loading';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useSessions } from '@/hooks/use-sessions';
-import { useClasses } from '@/hooks/use-classes';
+import { useClasses, useSections } from '@/hooks/use-classes';
 import { useSubjects } from '@/hooks/use-subjects';
 import { useTeachers } from '@/hooks/use-teachers';
 import api from '@/lib/api/client';
@@ -73,8 +73,11 @@ export function AssignmentForm() {
   const createMutation = useMutation({
     mutationFn: (data: AssignmentFormData) =>
       api.post('/academics/teacher-assignments/', {
-        ...data,
-        session: sessionId,
+        teacher_id: data.teacher,
+        class_id: data.class_ref,
+        section_id: data.section,
+        subject_id: data.subject,
+        session_id: sessionId,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['teacher-assignments'] });
@@ -96,19 +99,28 @@ export function AssignmentForm() {
 
   const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<AssignmentFormData>({
     resolver: zodResolver(assignmentSchema),
+    defaultValues: {
+      teacher: '',
+      class_ref: '',
+      section: '',
+      subject: '',
+    }
   });
 
   const watchClass = watch('class_ref');
-
-  const selectedClassObj = classes.find((c: any) => c.id === watchClass);
-  const sections = selectedClassObj?.sections || [];
+  const { data: sections = [] } = useSections(watchClass);
 
   const onSubmit = (data: AssignmentFormData) => {
     createMutation.mutate(data);
   };
 
   const handleCreate = () => {
-    reset();
+    reset({
+      teacher: '',
+      class_ref: '',
+      section: '',
+      subject: '',
+    });
     setShowCreateModal(true);
   };
 
@@ -194,6 +206,7 @@ export function AssignmentForm() {
         <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
           <Select
             label="Teacher"
+            placeholder="Select teacher"
             options={teachers.map((t: any) => ({ value: t.id, label: t.name || t.user_email }))}
             error={errors.teacher?.message}
             {...register('teacher')}
@@ -201,20 +214,23 @@ export function AssignmentForm() {
           <div className="grid grid-cols-2 gap-4">
             <Select
               label="Class"
+              placeholder="Select class"
               options={classes.map((c: any) => ({ value: c.id, label: c.name }))}
               error={errors.class_ref?.message}
               {...register('class_ref')}
             />
             <Select
               label="Section"
+              placeholder={!watchClass ? "Select a class" : sections.length === 0 ? "No sections" : "Select section"}
               options={sections.map((s: any) => ({ value: s.id, label: s.name }))}
               error={errors.section?.message}
               {...register('section')}
-              disabled={!watchClass}
+              disabled={!watchClass || sections.length === 0}
             />
           </div>
           <Select
             label="Subject"
+            placeholder="Select subject"
             options={subjects.map((s: any) => ({ value: s.id, label: `${s.code} - ${s.name}` }))}
             error={errors.subject?.message}
             {...register('subject')}
