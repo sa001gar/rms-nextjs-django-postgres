@@ -30,6 +30,7 @@ const navItems = [
   { title: 'Teachers', href: '/admin/teachers', icon: UserCheck },
   { title: 'Students', href: '/admin/students', icon: Users },
   { title: 'Enrollments', href: '/admin/enrollments', icon: ClipboardList },
+  { title: 'Attendance', href: '/admin/attendance', icon: BookOpen },
   { title: 'Assessments', href: '/admin/assessments', icon: FileText },
   { title: 'Grading', href: '/admin/grading', icon: Award },
   { title: 'Assignments', href: '/admin/assignments', icon: UserPlus },

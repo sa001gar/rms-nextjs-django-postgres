@@ -22,6 +22,8 @@ from academics.api.serializers import (
     SubjectOutputSerializer,
     ClassSubjectInputSerializer,
     ClassSubjectOutputSerializer,
+    TermInputSerializer,
+    TermOutputSerializer,
     AssessmentTypeInputSerializer,
     AssessmentTypeOutputSerializer,
     AssessmentWeightageInputSerializer,
@@ -66,6 +68,49 @@ class AcademicSessionViewSet(viewsets.ViewSet):
     def lock(self, request, pk=None):
         session = self.service.lock(pk)
         return Response(AcademicSessionOutputSerializer(session).data)
+
+
+class TermViewSet(viewsets.ViewSet):
+    permission_classes = [IsAdmin]
+
+    def list(self, request):
+        from academics.models import Term
+        session_id = request.query_params.get("session_id")
+        qs = Term.objects.all()
+        if session_id:
+            qs = qs.filter(session_id=session_id)
+        data = [TermOutputSerializer(t).data for t in qs]
+        return Response(data)
+
+    def retrieve(self, request, pk=None):
+        from academics.models import Term
+        obj = Term.objects.filter(pk=pk).first()
+        if not obj:
+            return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+        return Response(TermOutputSerializer(obj).data)
+
+    def create(self, request):
+        from academics.models import Term
+        serializer = TermInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        term = Term.objects.create(**serializer.validated_data)
+        return Response(
+            TermOutputSerializer(term).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    def update(self, request, pk=None):
+        from academics.models import Term
+        serializer = TermInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        Term.objects.filter(pk=pk).update(**serializer.validated_data)
+        term = Term.objects.get(pk=pk)
+        return Response(TermOutputSerializer(term).data)
+
+    def destroy(self, request, pk=None):
+        from academics.models import Term
+        Term.objects.filter(pk=pk).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class ClassViewSet(viewsets.ViewSet):
@@ -229,6 +274,10 @@ class AssessmentTypeViewSet(viewsets.ViewSet):
         serializer.is_valid(raise_exception=True)
         at = self.service.update(pk, **serializer.validated_data)
         return Response(AssessmentTypeOutputSerializer(at).data)
+
+    def destroy(self, request, pk=None):
+        self.service.delete(pk)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=False, methods=["post"], url_path="set-weightage")
     def set_weightage(self, request):

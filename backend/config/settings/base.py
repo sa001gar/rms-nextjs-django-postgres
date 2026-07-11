@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     "reporting",
     "analytics",
     "student",
+    "attendance",
 ]
 
 MIDDLEWARE = [

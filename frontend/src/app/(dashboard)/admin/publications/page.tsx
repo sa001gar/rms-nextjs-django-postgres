@@ -246,6 +246,18 @@ export default function PublicationsPage() {
                           Unpublish
                         </Button>
                       )}
+                      
+                      {pub.status === 'published' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          asChild
+                        >
+                          <a href={`/admin/publications/${pub.id}/report-card`} target="_blank" rel="noopener noreferrer">
+                            View Report Cards
+                          </a>
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

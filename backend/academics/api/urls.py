@@ -10,10 +10,12 @@ from academics.api.views import (
     AssessmentTypeViewSet,
     GradePolicyViewSet,
     TeacherAssignmentViewSet,
+    TermViewSet,
 )
 
 router = DefaultRouter()
 router.register(r"sessions", AcademicSessionViewSet, basename="sessions")
+router.register(r"terms", TermViewSet, basename="terms")
 router.register(r"classes", ClassViewSet, basename="classes")
 router.register(r"subjects", SubjectViewSet, basename="subjects")
 router.register(r"assessment-types", AssessmentTypeViewSet, basename="assessment-types")

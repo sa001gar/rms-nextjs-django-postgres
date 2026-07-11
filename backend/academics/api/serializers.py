@@ -8,6 +8,7 @@ from academics.models import (
     Section,
     Subject,
     ClassSubject,
+    Term,
     AssessmentType,
     AssessmentWeightage,
     GradePolicy,
@@ -97,6 +98,23 @@ class ClassSubjectOutputSerializer(serializers.Serializer):
 
 
 # ──────────────────────────────────────────────
+# Term
+# ──────────────────────────────────────────────
+class TermInputSerializer(serializers.Serializer):
+    session_id = serializers.UUIDField()
+    name = serializers.CharField(max_length=50)
+    display_order = serializers.IntegerField(min_value=0, default=0)
+
+
+class TermOutputSerializer(serializers.Serializer):
+    id = serializers.UUIDField(read_only=True)
+    session = serializers.UUIDField(read_only=True)
+    name = serializers.CharField()
+    display_order = serializers.IntegerField()
+    created_at = serializers.DateTimeField(read_only=True)
+
+
+# ──────────────────────────────────────────────
 # AssessmentType & Weightage
 # ──────────────────────────────────────────────
 class AssessmentTypeInputSerializer(serializers.Serializer):
@@ -105,6 +123,7 @@ class AssessmentTypeInputSerializer(serializers.Serializer):
     category = serializers.ChoiceField(
         choices=AssessmentType.CATEGORY_CHOICES, default="summative"
     )
+    term_id = serializers.UUIDField(required=False, allow_null=True)
     display_order = serializers.IntegerField(min_value=0, default=0)
 
 
@@ -113,6 +132,7 @@ class AssessmentTypeOutputSerializer(serializers.Serializer):
     name = serializers.CharField()
     code = serializers.CharField()
     category = serializers.CharField()
+    term = TermOutputSerializer(read_only=True, allow_null=True)
     display_order = serializers.IntegerField()
     is_active = serializers.BooleanField()
     created_at = serializers.DateTimeField(read_only=True)

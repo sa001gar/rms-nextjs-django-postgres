@@ -97,6 +97,24 @@ class ClassSubject(BaseModel):
         return f"{self.class_ref.name} - {self.subject.name}"
 
 
+class Term(BaseModel):
+    """Academic Term (e.g. First Term, Second Term)."""
+
+    session = models.ForeignKey(
+        AcademicSession, on_delete=models.CASCADE, related_name="terms"
+    )
+    name = models.CharField(max_length=50)
+    display_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        db_table = "terms"
+        ordering = ["session", "display_order"]
+        unique_together = [("session", "name")]
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.session.name})"
+
+
 class AssessmentType(BaseModel):
     """Type of assessment (e.g. Unit Test, Final Exam)."""
 
@@ -111,6 +129,9 @@ class AssessmentType(BaseModel):
     name = models.CharField(max_length=100)
     code = models.CharField(max_length=30, unique=True)
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default="summative")
+    term = models.ForeignKey(
+        Term, on_delete=models.SET_NULL, null=True, blank=True, related_name="assessment_types"
+    )
     display_order = models.PositiveIntegerField(default=0)
     is_active = models.BooleanField(default=True)
 

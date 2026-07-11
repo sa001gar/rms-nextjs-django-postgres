@@ -19,6 +19,8 @@ import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { assessmentsApi, type AssessmentCategory } from '@/lib/api/assessments';
 import { classesApi } from '@/lib/api/classes';
 import { subjectsApi } from '@/lib/api/subjects';
+import { termsApi, type Term } from '@/lib/api/terms';
+import { useActiveSession } from '@/hooks/use-sessions';
 import type { Class, Section, Subject } from '@/types/academic';
 
 const CATEGORY_OPTIONS = [
@@ -33,6 +35,7 @@ const typeSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   code: z.string().min(1, 'Code is required'),
   category: z.string().min(1, 'Category is required'),
+  term_id: z.string().nullable().optional(),
   display_order: z.number().int('Must be a whole number').min(0, 'Min is 0'),
   is_active: z.boolean(),
 });
@@ -77,6 +80,8 @@ function AssessmentTypesTab() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AssessmentCategory | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [terms, setTerms] = useState<Term[]>([]);
+  const { data: activeSession } = useActiveSession();
 
   const {
     register,
@@ -91,6 +96,7 @@ function AssessmentTypesTab() {
       name: '',
       code: '',
       category: '',
+      term_id: null,
       display_order: 0,
       is_active: true,
     },
@@ -108,13 +114,25 @@ function AssessmentTypesTab() {
     }
   }, []);
 
+  const fetchTerms = useCallback(async () => {
+    if (activeSession?.id) {
+      try {
+        const data = await termsApi.getAll(activeSession.id);
+        setTerms(data);
+      } catch (err) {
+        console.error('Failed to load terms');
+      }
+    }
+  }, [activeSession?.id]);
+
   useEffect(() => {
     fetchTypes();
-  }, [fetchTypes]);
+    fetchTerms();
+  }, [fetchTypes, fetchTerms]);
 
   const openAddModal = () => {
     setEditingId(null);
-    reset({ name: '', code: '', category: '', display_order: 0, is_active: true });
+    reset({ name: '', code: '', category: '', term_id: null, display_order: 0, is_active: true });
     setModalOpen(true);
   };
 
@@ -124,6 +142,7 @@ function AssessmentTypesTab() {
       name: record.name,
       code: record.code,
       category: record.category,
+      term_id: record.term?.id || null,
       display_order: record.display_order ?? 0,
       is_active: record.is_active,
     });
@@ -192,6 +211,7 @@ function AssessmentTypesTab() {
                 <TableHead>Name</TableHead>
                 <TableHead>Code</TableHead>
                 <TableHead>Category</TableHead>
+                <TableHead>Term</TableHead>
                 <TableHead>Order</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="w-[100px]">Actions</TableHead>
@@ -205,6 +225,7 @@ function AssessmentTypesTab() {
                   <TableCell>
                     <Badge variant="secondary">{record.category || '-'}</Badge>
                   </TableCell>
+                  <TableCell>{record.term?.name || '-'}</TableCell>
                   <TableCell>{record.display_order ?? 0}</TableCell>
                   <TableCell>
                     <Badge variant={record.is_active ? 'success' : 'secondary'}>
@@ -262,6 +283,19 @@ function AssessmentTypesTab() {
             {errors.category?.message && (
               <p className="mt-1.5 text-sm text-red-600">{errors.category.message}</p>
             )}
+          </div>
+          <div className="w-full">
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Term (Optional)</label>
+            <select
+              className="flex h-10 w-full appearance-none rounded-lg border border-gray-300 bg-white px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 disabled:cursor-not-allowed disabled:opacity-50"
+              value={watch('term_id') || ''}
+              onChange={(e) => setValue('term_id', e.target.value || null, { shouldValidate: true })}
+            >
+              <option value="">No Term</option>
+              {terms.map((t) => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
           </div>
           <Input
             label="Display Order"

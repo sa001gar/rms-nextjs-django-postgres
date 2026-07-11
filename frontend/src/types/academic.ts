@@ -47,6 +47,12 @@ export interface AssessmentType {
   id: string;
   name: string;
   code: string;
+  category: string;
+  term?: {
+    id: string;
+    name: string;
+    session: string;
+  };
   is_active: boolean;
   created_at: string;
 }
