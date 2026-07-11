@@ -11,7 +11,7 @@ import { useActiveSession, useSessions } from '@/hooks/use-sessions';
 import { useClasses, useSections } from '@/hooks/use-classes';
 import { enrollmentsApi } from '@/lib/api/enrollments';
 import { termsApi } from '@/lib/api/terms';
-import { attendanceApi } from '@/lib/api/attendance';
+import { attendanceApi, type TermAttendance } from '@/lib/api/attendance';
 import { Loader2, Save, Send, Hash } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -87,7 +87,7 @@ export function AttendanceEntry() {
       });
       const enrollments = (enrollmentResponse.results || []) as unknown as EnrollmentItem[];
       
-      let existingAttendance = [];
+      let existingAttendance: TermAttendance[] = [];
       try {
         existingAttendance = await attendanceApi.getAll({
           session_id: sessionId,

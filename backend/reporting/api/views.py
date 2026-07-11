@@ -1,4 +1,4 @@
-"""DRF views for reporting API."""
+"""DRF views for reporting API — marksheets and rankings (legacy)."""
 
 from uuid import UUID
 
@@ -7,52 +7,12 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from core.permissions import IsAdminOrTeacher
-from reporting.services.report_card_service import ReportCardService
 from reporting.services.marksheet_service import MarksheetService
 from reporting.services.ranking_service import RankingService
-from reporting.selectors.report_selector import ReportSelector
 from reporting.api.serializers import (
-    ReportCardDTOSerializer,
     MarksheetDTOSerializer,
-    ClassReportRequestSerializer,
     RankingEntrySerializer,
 )
-
-
-class ReportCardViewSet(viewsets.ViewSet):
-    """ViewSet for report card generation."""
-
-    permission_classes = [IsAdminOrTeacher]
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self._service = ReportCardService()
-
-    @action(detail=False, methods=["get"], url_path="student/(?P<enrollment_id>[^/.]+)")
-    def student_report_card(self, request, enrollment_id=None):
-        """Generate report card for a single student enrollment."""
-        report = self._service.generate_student_report_card(UUID(enrollment_id))
-        return Response(ReportCardDTOSerializer(report).data)
-
-    @action(detail=False, methods=["get"], url_path="class")
-    def class_report_cards(self, request):
-        """Generate report cards for an entire class-section-session."""
-        class_id = request.query_params.get("class_id")
-        section_id = request.query_params.get("section_id")
-        session_id = request.query_params.get("session_id")
-
-        if not all([class_id, section_id, session_id]):
-            return Response(
-                {"detail": "class_id, section_id and session_id query params are required."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        reports = self._service.generate_class_report_cards(
-            UUID(class_id), UUID(section_id), UUID(session_id)
-        )
-        return Response(
-            ReportCardDTOSerializer(reports, many=True).data
-        )
 
 
 class MarksheetViewSet(viewsets.ViewSet):

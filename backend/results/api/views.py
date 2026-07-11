@@ -25,7 +25,7 @@ class MarksEntryViewSet(viewsets.ModelViewSet):
     """ViewSet for MarksEntry CRUD operations."""
 
     queryset = MarksEntry.objects.select_related(
-        "subject", "assessment_type", "entered_by"
+        "subject", "exam_component", "entered_by"
     ).all()
     serializer_class = MarksEntrySerializer
     permission_classes = [IsAdminOrTeacher]
@@ -53,9 +53,10 @@ class MarksEntryViewSet(viewsets.ModelViewSet):
         entry = self._service.enter_marks(
             enrollment_id=data["enrollment_id"],
             subject_id=data["subject_id"],
-            assessment_type_id=data["assessment_type_id"],
-            full_marks=data["full_marks"],
+            exam_component_id=data["exam_component_id"],
             obtained_marks=data["obtained_marks"],
+            is_absent=data.get("is_absent", False),
+            is_grade_only=data.get("is_grade_only", False),
             entered_by_id=request.user.id,
         )
         return Response(
@@ -69,9 +70,14 @@ class MarksEntryViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
+        update_kwargs = {"obtained_marks": data["obtained_marks"]}
+        if "is_absent" in data:
+            update_kwargs["is_absent"] = data["is_absent"]
+        if "is_grade_only" in data:
+            update_kwargs["is_grade_only"] = data["is_grade_only"]
         updated = self._service.update_marks(
             entry_id=entry.id,
-            obtained_marks=data["obtained_marks"],
+            **update_kwargs,
         )
         return Response(MarksEntrySerializer(updated).data)
 

@@ -207,7 +207,7 @@ function SubjectsSection({ classId }: { classId: string }) {
               <Button 
                 variant="ghost" 
                 size="icon-sm" 
-                onClick={() => handleUnassign(s.subject_id)} 
+                onClick={() => handleUnassign(s.subject.id)} 
                 className="text-red-500"
                 isLoading={unassignSubject.isPending}
               >

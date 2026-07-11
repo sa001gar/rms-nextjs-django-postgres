@@ -14,5 +14,7 @@ class SubjectRepository(BaseRepository[Subject]):
     def get_by_code(self, code: str) -> Subject | None:
         return Subject.objects.filter(code=code).first()
 
-    def list_by_type(self, subject_type: str) -> QuerySet[Subject]:
-        return Subject.objects.filter(subject_type=subject_type).order_by("code")
+    def list_by_category(self, category_code: str) -> QuerySet[Subject]:
+        return Subject.objects.filter(
+            subject_category__code=category_code
+        ).order_by("code")

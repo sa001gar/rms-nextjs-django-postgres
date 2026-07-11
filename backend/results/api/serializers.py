@@ -14,8 +14,8 @@ class MarksEntrySerializer(serializers.ModelSerializer):
     subject_name = serializers.CharField(
         source="subject.name", read_only=True
     )
-    assessment_type_name = serializers.CharField(
-        source="assessment_type.name", read_only=True
+    exam_component_name = serializers.CharField(
+        source="exam_component.name", read_only=True, default=None
     )
 
     class Meta:
@@ -25,10 +25,11 @@ class MarksEntrySerializer(serializers.ModelSerializer):
             "enrollment",
             "subject",
             "subject_name",
-            "assessment_type",
-            "assessment_type_name",
-            "full_marks",
+            "exam_component",
+            "exam_component_name",
             "obtained_marks",
+            "is_absent",
+            "is_grade_only",
             "remarks",
             "entered_by",
             "entered_by_email",
@@ -43,16 +44,19 @@ class MarksEntryCreateSerializer(serializers.Serializer):
 
     enrollment_id = serializers.UUIDField()
     subject_id = serializers.UUIDField()
-    assessment_type_id = serializers.UUIDField()
-    full_marks = serializers.IntegerField(min_value=1)
-    obtained_marks = serializers.IntegerField(min_value=0)
+    exam_component_id = serializers.UUIDField()
+    obtained_marks = serializers.DecimalField(max_digits=6, decimal_places=2)
+    is_absent = serializers.BooleanField(default=False)
+    is_grade_only = serializers.BooleanField(default=False)
     remarks = serializers.CharField(required=False, default="", allow_blank=True)
 
 
 class MarksEntryUpdateSerializer(serializers.Serializer):
     """Serializer for updating obtained marks."""
 
-    obtained_marks = serializers.IntegerField(min_value=0)
+    obtained_marks = serializers.DecimalField(max_digits=6, decimal_places=2)
+    is_absent = serializers.BooleanField(required=False)
+    is_grade_only = serializers.BooleanField(required=False)
     remarks = serializers.CharField(required=False, default="", allow_blank=True)
 
 
@@ -61,9 +65,10 @@ class BulkMarksEntrySerializer(serializers.Serializer):
 
     enrollment_id = serializers.UUIDField()
     subject_id = serializers.UUIDField()
-    assessment_type_id = serializers.UUIDField()
-    full_marks = serializers.IntegerField(min_value=1)
-    obtained_marks = serializers.IntegerField(min_value=0)
+    exam_component_id = serializers.UUIDField()
+    obtained_marks = serializers.DecimalField(max_digits=6, decimal_places=2)
+    is_absent = serializers.BooleanField(default=False)
+    is_grade_only = serializers.BooleanField(default=False)
     remarks = serializers.CharField(required=False, default="", allow_blank=True)
 
 

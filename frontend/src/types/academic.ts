@@ -67,6 +67,15 @@ export interface AssessmentWeightage {
   created_at: string;
 }
 
+export interface SubjectCategory {
+  id: string;
+  name: string;
+  code: string;
+  is_scholastic: boolean;
+  display_order: number;
+  created_at: string;
+}
+
 export interface GradePolicy {
   id: string;
   min_percentage: number;

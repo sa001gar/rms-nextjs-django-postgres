@@ -116,7 +116,6 @@ export function ResultsView() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Subject</TableHead>
-                    <TableHead>Assessment Type</TableHead>
                     <TableHead className="text-right">Marks Obtained</TableHead>
                     <TableHead className="text-right">Full Marks</TableHead>
                     <TableHead className="text-right">Percentage</TableHead>
@@ -124,24 +123,22 @@ export function ResultsView() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {reportCard.results.map((r, i) => {
-                    const pct = r.full_marks > 0 ? ((r.marks_obtained / r.full_marks) * 100).toFixed(1) : '0.0';
+                  {reportCard.subjects.map((subject, i) => {
                     return (
                       <TableRow key={i}>
-                        <TableCell className="font-medium">{r.subject_name}</TableCell>
-                        <TableCell className="text-gray-500">{r.assessment_type ?? '—'}</TableCell>
-                        <TableCell className="text-right">{r.marks_obtained}</TableCell>
-                        <TableCell className="text-right">{r.full_marks}</TableCell>
-                        <TableCell className="text-right">{pct}%</TableCell>
+                        <TableCell className="font-medium">{subject.subject_name}</TableCell>
+                        <TableCell className="text-right">{subject.total_obtained}</TableCell>
+                        <TableCell className="text-right">{subject.total_full}</TableCell>
+                        <TableCell className="text-right">{subject.overall_percentage?.toFixed(1) ?? '0.0'}%</TableCell>
                         <TableCell>
-                          <Badge variant={gradeVariant(r.grade)}>{r.grade}</Badge>
+                          <Badge variant={gradeVariant(subject.overall_grade)}>{subject.overall_grade}</Badge>
                         </TableCell>
                       </TableRow>
                     );
                   })}
-                  {reportCard.results.length === 0 && (
+                  {reportCard.subjects.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-gray-500">
+                      <TableCell colSpan={5} className="text-center text-gray-500">
                         No results found for this session.
                       </TableCell>
                     </TableRow>
@@ -160,14 +157,14 @@ export function ResultsView() {
                 <div className="rounded-lg border border-gray-200 p-4">
                   <p className="text-sm text-gray-500">Total Marks</p>
                   <p className="mt-1 text-2xl font-semibold text-gray-900">
-                    {reportCard.summary.total_marks}{' '}
-                    <span className="text-sm font-normal text-gray-400">/ {reportCard.summary.total_full_marks}</span>
+                    {reportCard.summary.total_marks_obtained}{' '}
+                     <span className="text-sm font-normal text-gray-400">/ {reportCard.summary.total_marks_full}</span>
                   </p>
                 </div>
                 <div className="rounded-lg border border-gray-200 p-4">
                   <p className="text-sm text-gray-500">Overall Percentage</p>
                   <p className="mt-1 text-2xl font-semibold text-gray-900">
-                    {reportCard.summary.percentage.toFixed(1)}%
+                    {reportCard.summary.overall_percentage?.toFixed(1) ?? '0.0'}%
                   </p>
                 </div>
                 <div className="rounded-lg border border-gray-200 p-4">
@@ -178,11 +175,11 @@ export function ResultsView() {
                     </Badge>
                   </div>
                 </div>
-                {reportCard.summary.rank != null && (
+                {reportCard.summary.rank_value != null && (
                   <div className="rounded-lg border border-gray-200 p-4">
                     <p className="text-sm text-gray-500">Class Rank</p>
                     <p className="mt-1 text-2xl font-semibold text-gray-900">
-                      #{reportCard.summary.rank}
+                      #{reportCard.summary.rank_value}
                     </p>
                   </div>
                 )}

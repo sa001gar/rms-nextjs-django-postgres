@@ -19,8 +19,8 @@ class MarksEntryRepository(BaseRepository[MarksEntry]):
     def get_for_enrollment(self, enrollment_id: UUID) -> QuerySet[MarksEntry]:
         return (
             self.model.objects.filter(enrollment_id=enrollment_id)
-            .select_related("subject", "assessment_type", "entered_by")
-            .order_by("subject__code", "assessment_type__display_order")
+            .select_related("subject", "exam_component", "entered_by")
+            .order_by("subject__code", "exam_component__display_order")
         )
 
     def get_for_class_subject(
@@ -31,18 +31,18 @@ class MarksEntryRepository(BaseRepository[MarksEntry]):
                 enrollment_id__in=enrollment_ids,
                 subject_id=subject_id,
             )
-            .select_related("enrollment", "assessment_type", "entered_by")
-            .order_by("enrollment__roll_no", "assessment_type__display_order")
+            .select_related("enrollment", "exam_component", "entered_by")
+            .order_by("enrollment__roll_no", "exam_component__display_order")
         )
 
     def get_entry(
-        self, enrollment_id: UUID, subject_id: UUID, assessment_type_id: UUID
+        self, enrollment_id: UUID, subject_id: UUID, exam_component_id: UUID
     ) -> MarksEntry | None:
         try:
             return self.model.objects.get(
                 enrollment_id=enrollment_id,
                 subject_id=subject_id,
-                assessment_type_id=assessment_type_id,
+                exam_component_id=exam_component_id,
             )
         except self.model.DoesNotExist:
             return None
@@ -55,11 +55,12 @@ class MarksEntryRepository(BaseRepository[MarksEntry]):
             existing = self.get_entry(
                 enrollment_id=entry["enrollment_id"],
                 subject_id=entry["subject_id"],
-                assessment_type_id=entry["assessment_type_id"],
+                exam_component_id=entry["exam_component_id"],
             )
             if existing:
-                existing.full_marks = entry["full_marks"]
                 existing.obtained_marks = entry["obtained_marks"]
+                existing.is_absent = entry.get("is_absent", False)
+                existing.is_grade_only = entry.get("is_grade_only", False)
                 if entry.get("remarks"):
                     existing.remarks = entry["remarks"]
                 if entry.get("entered_by_id"):
@@ -70,9 +71,10 @@ class MarksEntryRepository(BaseRepository[MarksEntry]):
                 obj = self.model.objects.create(
                     enrollment_id=entry["enrollment_id"],
                     subject_id=entry["subject_id"],
-                    assessment_type_id=entry["assessment_type_id"],
-                    full_marks=entry["full_marks"],
+                    exam_component_id=entry["exam_component_id"],
                     obtained_marks=entry["obtained_marks"],
+                    is_absent=entry.get("is_absent", False),
+                    is_grade_only=entry.get("is_grade_only", False),
                     remarks=entry.get("remarks", ""),
                     entered_by_id=entry.get("entered_by_id"),
                 )

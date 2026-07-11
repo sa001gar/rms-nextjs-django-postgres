@@ -22,8 +22,7 @@ class SubjectService(BaseService):
         self,
         name: str,
         code: str,
-        subject_type: str = "core",
-        default_full_marks: int = 100,
+        subject_category_id: str | None = None,
     ) -> Subject:
         existing = self.repo.get_by_code(code)
         if existing:
@@ -32,8 +31,7 @@ class SubjectService(BaseService):
         return self.repo.create(
             name=name,
             code=code,
-            subject_type=subject_type,
-            default_full_marks=default_full_marks,
+            subject_category_id=subject_category_id,
         )
 
     def update(self, subject_id: UUID, **kwargs) -> Subject:
@@ -85,5 +83,5 @@ class SubjectService(BaseService):
     def list_class_subjects(self, class_id: UUID) -> QuerySet[ClassSubject]:
         return ClassSubject.objects.filter(class_ref_id=class_id).select_related("subject")
 
-    def list_by_type(self, subject_type: str) -> QuerySet[Subject]:
-        return self.repo.list_by_type(subject_type)
+    def list_by_category(self, category_code: str) -> QuerySet[Subject]:
+        return self.repo.list_by_category(category_code)

@@ -8,8 +8,6 @@ from core.permissions import IsAdmin
 from academics.services.session_service import SessionService
 from academics.services.class_service import ClassService
 from academics.services.subject_service import SubjectService
-from academics.services.assessment_service import AssessmentService
-from academics.services.grading_service import GradingService
 from academics.services.assignment_service import AssignmentService
 from academics.api.serializers import (
     AcademicSessionInputSerializer,
@@ -22,16 +20,31 @@ from academics.api.serializers import (
     SubjectOutputSerializer,
     ClassSubjectInputSerializer,
     ClassSubjectOutputSerializer,
-    TermInputSerializer,
-    TermOutputSerializer,
-    AssessmentTypeInputSerializer,
-    AssessmentTypeOutputSerializer,
-    AssessmentWeightageInputSerializer,
-    AssessmentWeightageOutputSerializer,
-    GradePolicyInputSerializer,
-    GradePolicyOutputSerializer,
     TeacherAssignmentInputSerializer,
     TeacherAssignmentOutputSerializer,
+    ExamInputSerializer,
+    ExamSerializer,
+    ExamComponentInputSerializer,
+    ExamComponentSerializer,
+    SubjectAssessmentSchemeInputSerializer,
+    SubjectAssessmentSchemeSerializer,
+    BulkSubjectAssessmentSchemeSerializer,
+    GradePolicySetInputSerializer,
+    GradePolicySetSerializer,
+    PromotionRuleInputSerializer,
+    PromotionRuleSerializer,
+    TermSerializer,
+    TermInputSerializer,
+    SubjectCategorySerializer,
+    SubjectCategoryInputSerializer,
+    ReportCardTemplateInputSerializer,
+    ReportCardTemplateSerializer,
+    ReportCardSectionSerializer,
+    ReportCardSectionInputSerializer,
+    ReportCardSectionSubjectGroupSerializer,
+    ReportCardSectionSubjectGroupInputSerializer,
+    ReportCardTemplateAssignmentSerializer,
+    ReportCardTemplateAssignmentInputSerializer,
 )
 
 
@@ -79,45 +92,107 @@ class TermViewSet(viewsets.ViewSet):
         qs = Term.objects.all()
         if session_id:
             qs = qs.filter(session_id=session_id)
-        data = [TermOutputSerializer(t).data for t in qs]
+        qs = qs.order_by("display_order")
+        data = [TermSerializer(t).data for t in qs]
         return Response(data)
-
-    def retrieve(self, request, pk=None):
-        from academics.models import Term
-        obj = Term.objects.filter(pk=pk).first()
-        if not obj:
-            return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
-        return Response(TermOutputSerializer(obj).data)
 
     def create(self, request):
         from academics.models import Term
         serializer = TermInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        term = Term.objects.create(**serializer.validated_data)
-        return Response(
-            TermOutputSerializer(term).data,
-            status=status.HTTP_201_CREATED,
-        )
+        obj = Term.objects.create(**serializer.validated_data)
+        return Response(TermSerializer(obj).data, status=status.HTTP_201_CREATED)
 
     def update(self, request, pk=None):
         from academics.models import Term
         serializer = TermInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         Term.objects.filter(pk=pk).update(**serializer.validated_data)
-        term = Term.objects.get(pk=pk)
-        return Response(TermOutputSerializer(term).data)
-
-    def partial_update(self, request, pk=None):
-        from academics.models import Term
-        serializer = TermInputSerializer(data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        Term.objects.filter(pk=pk).update(**serializer.validated_data)
-        term = Term.objects.get(pk=pk)
-        return Response(TermOutputSerializer(term).data)
+        obj = Term.objects.get(pk=pk)
+        return Response(TermSerializer(obj).data)
 
     def destroy(self, request, pk=None):
         from academics.models import Term
         Term.objects.filter(pk=pk).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class SubjectCategoryViewSet(viewsets.ViewSet):
+    permission_classes = [IsAdmin]
+
+    def list(self, request):
+        from academics.models import SubjectCategory
+        qs = SubjectCategory.objects.all().order_by("display_order")
+        data = [SubjectCategorySerializer(c).data for c in qs]
+        return Response(data)
+
+    def create(self, request):
+        from academics.models import SubjectCategory
+        serializer = SubjectCategoryInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        obj = SubjectCategory.objects.create(**serializer.validated_data)
+        return Response(SubjectCategorySerializer(obj).data, status=status.HTTP_201_CREATED)
+
+    def update(self, request, pk=None):
+        from academics.models import SubjectCategory
+        serializer = SubjectCategoryInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        SubjectCategory.objects.filter(pk=pk).update(**serializer.validated_data)
+        obj = SubjectCategory.objects.get(pk=pk)
+        return Response(SubjectCategorySerializer(obj).data)
+
+    def destroy(self, request, pk=None):
+        from academics.models import SubjectCategory
+        SubjectCategory.objects.filter(pk=pk).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ExamViewSet(viewsets.ViewSet):
+    permission_classes = [IsAdmin]
+
+    def list(self, request):
+        from academics.models import Exam
+        session_id = request.query_params.get("session_id")
+        qs = Exam.objects.all()
+        if session_id:
+            qs = qs.filter(session_id=session_id)
+        qs = qs.prefetch_related("components")
+        data = []
+        for exam in qs:
+            d = ExamSerializer(exam).data
+            d["components"] = [
+                ExamComponentSerializer(c).data for c in exam.components.all()
+            ]
+            data.append(d)
+        return Response(data)
+
+    def retrieve(self, request, pk=None):
+        from academics.models import Exam
+        exam = Exam.objects.prefetch_related("components").filter(pk=pk).first()
+        if not exam:
+            return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+        d = ExamSerializer(exam).data
+        d["components"] = [ExamComponentSerializer(c).data for c in exam.components.all()]
+        return Response(d)
+
+    def create(self, request):
+        from academics.models import Exam
+        serializer = ExamInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        exam = Exam.objects.create(**serializer.validated_data)
+        return Response(ExamSerializer(exam).data, status=status.HTTP_201_CREATED)
+
+    def update(self, request, pk=None):
+        from academics.models import Exam
+        serializer = ExamInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        Exam.objects.filter(pk=pk).update(**serializer.validated_data)
+        exam = Exam.objects.get(pk=pk)
+        return Response(ExamSerializer(exam).data)
+
+    def destroy(self, request, pk=None):
+        from academics.models import Exam
+        Exam.objects.filter(pk=pk).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -176,9 +251,9 @@ class SubjectViewSet(viewsets.ViewSet):
     service = SubjectService()
 
     def list(self, request):
-        subject_type = request.query_params.get("type")
-        if subject_type:
-            subjects = self.service.list_by_type(subject_type)
+        category = request.query_params.get("category")
+        if category:
+            subjects = self.service.list_by_category(category)
         else:
             subjects = self.service.list_all()
         data = [SubjectOutputSerializer(s).data for s in subjects]
@@ -209,10 +284,10 @@ class SubjectViewSet(viewsets.ViewSet):
         self.service.delete(pk)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @action(detail=False, methods=["get"], url_path="by-type")
-    def by_type(self, request):
-        subject_type = request.query_params.get("type", "core")
-        subjects = self.service.list_by_type(subject_type)
+    @action(detail=False, methods=["get"], url_path="by-category")
+    def by_category(self, request):
+        category = request.query_params.get("category", "")
+        subjects = self.service.list_by_category(category) if category else self.service.list_all()
         data = [SubjectOutputSerializer(s).data for s in subjects]
         return Response(data)
 
@@ -253,111 +328,341 @@ class SubjectViewSet(viewsets.ViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class AssessmentTypeViewSet(viewsets.ViewSet):
+class ExamComponentViewSet(viewsets.ViewSet):
     permission_classes = [IsAdmin]
-    service = AssessmentService()
 
     def list(self, request):
-        types = self.service.list_active()
-        data = [AssessmentTypeOutputSerializer(t).data for t in types]
+        from academics.models import ExamComponent
+        exam_id = request.query_params.get("exam_id")
+        qs = ExamComponent.objects.select_related("exam", "parent")
+        if exam_id:
+            qs = qs.filter(exam_id=exam_id)
+        data = [ExamComponentSerializer(c).data for c in qs]
         return Response(data)
 
-    def retrieve(self, request, pk=None):
-        obj = self.service.repo.get_by_id(pk)
-        if not obj:
-            return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
-        return Response(AssessmentTypeOutputSerializer(obj).data)
-
     def create(self, request):
-        serializer = AssessmentTypeInputSerializer(data=request.data)
+        from academics.models import ExamComponent
+        serializer = ExamComponentInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        at = self.service.create_assessment_type(**serializer.validated_data)
-        return Response(
-            AssessmentTypeOutputSerializer(at).data,
-            status=status.HTTP_201_CREATED,
-        )
+        obj = ExamComponent.objects.create(**serializer.validated_data)
+        return Response(ExamComponentSerializer(obj).data, status=status.HTTP_201_CREATED)
 
     def update(self, request, pk=None):
-        serializer = AssessmentTypeInputSerializer(data=request.data)
+        from academics.models import ExamComponent
+        serializer = ExamComponentInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        at = self.service.update(pk, **serializer.validated_data)
-        return Response(AssessmentTypeOutputSerializer(at).data)
-
-    def partial_update(self, request, pk=None):
-        serializer = AssessmentTypeInputSerializer(data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        at = self.service.update(pk, **serializer.validated_data)
-        return Response(AssessmentTypeOutputSerializer(at).data)
+        ExamComponent.objects.filter(pk=pk).update(**serializer.validated_data)
+        obj = ExamComponent.objects.get(pk=pk)
+        return Response(ExamComponentSerializer(obj).data)
 
     def destroy(self, request, pk=None):
-        self.service.delete(pk)
+        from academics.models import ExamComponent
+        ExamComponent.objects.filter(pk=pk).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @action(detail=False, methods=["post"], url_path="set-weightage")
-    def set_weightage(self, request):
-        serializer = AssessmentWeightageInputSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        w = self.service.set_weightage(**serializer.validated_data)
-        return Response(
-            AssessmentWeightageOutputSerializer(w).data,
-            status=status.HTTP_201_CREATED,
-        )
 
-    @action(detail=False, methods=["get"], url_path="structure")
-    def structure(self, request):
-        class_id = request.query_params.get("class_id")
-        subject_id = request.query_params.get("subject_id")
-        if not class_id or not subject_id:
-            return Response(
-                {"detail": "class_id and subject_id query params required."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        weightages = self.service.get_assessment_structure(class_id, subject_id)
-        data = [AssessmentWeightageOutputSerializer(w).data for w in weightages]
-        return Response(data)
-
-
-class GradePolicyViewSet(viewsets.ViewSet):
+class SubjectAssessmentSchemeViewSet(viewsets.ViewSet):
     permission_classes = [IsAdmin]
-    service = GradingService()
 
     def list(self, request):
-        policies = self.service.get_all_policies()
-        data = [GradePolicyOutputSerializer(p).data for p in policies]
+        from academics.models import SubjectAssessmentScheme
+        class_id = request.query_params.get("class_id")
+        subject_id = request.query_params.get("subject_id")
+        qs = SubjectAssessmentScheme.objects.select_related(
+            "class_ref", "subject", "exam_component"
+        )
+        if class_id:
+            qs = qs.filter(class_ref_id=class_id)
+        if subject_id:
+            qs = qs.filter(subject_id=subject_id)
+        data = []
+        for m in qs:
+            d = SubjectAssessmentSchemeSerializer(m).data
+            d["class_name"] = m.class_ref.name
+            d["subject_name"] = m.subject.name
+            d["exam_component_name"] = m.exam_component.name
+            data.append(d)
+        return Response(data)
+
+    @action(detail=False, methods=["post"], url_path="bulk-save")
+    def bulk_save(self, request):
+        from academics.models import SubjectAssessmentScheme
+        from django.db import transaction
+
+        mappings = request.data.get("mappings", [])
+        if not mappings:
+            return Response({"detail": "No mappings provided."}, status=status.HTTP_400_BAD_REQUEST)
+
+        errors = []
+        results = []
+        with transaction.atomic():
+            for i, entry in enumerate(mappings):
+                serializer = SubjectAssessmentSchemeInputSerializer(data=entry)
+                if not serializer.is_valid():
+                    errors.append({"index": i, "errors": serializer.errors})
+                    continue
+                obj, _ = SubjectAssessmentScheme.objects.update_or_create(
+                    class_ref_id=entry["class_id"],
+                    subject_id=entry["subject_id"],
+                    exam_component_id=entry["exam_component_id"],
+                    defaults={
+                        "full_marks": entry.get("full_marks", 0),
+                        "weightage_pct": entry.get("weightage_pct", 100.00),
+                        "is_active": entry.get("is_active", True),
+                        "display_order": entry.get("display_order", 0),
+                    },
+                )
+                results.append(SubjectAssessmentSchemeSerializer(obj).data)
+
+        if errors:
+            return Response({"results": results, "errors": errors}, status=status.HTTP_207_MULTI_STATUS)
+        return Response(results, status=status.HTTP_200_OK)
+
+
+class GradePolicySetViewSet(viewsets.ViewSet):
+    permission_classes = [IsAdmin]
+
+    def list(self, request):
+        from academics.models import GradePolicySet, GradePolicyGrade
+        session_id = request.query_params.get("session_id")
+        qs = GradePolicySet.objects.all()
+        if session_id:
+            qs = qs.filter(session_id=session_id)
+        qs = qs.prefetch_related("grades")
+        data = []
+        for ps in qs:
+            d = GradePolicySetSerializer(ps).data
+            d["grades"] = [GradePolicyGradeSerializer(g).data for g in ps.grades.all()]
+            data.append(d)
+        return Response(data)
+
+    def create(self, request):
+        from academics.models import GradePolicySet, GradePolicyGrade
+        serializer = GradePolicySetInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        grades_data = serializer.validated_data.pop("grades", [])
+        ps = GradePolicySet.objects.create(**serializer.validated_data)
+        for g in grades_data:
+            GradePolicyGrade.objects.create(grade_policy_set=ps, **g)
+        ps.refresh_from_db()
+        d = GradePolicySetSerializer(ps).data
+        d["grades"] = [GradePolicyGradeSerializer(g).data for g in ps.grades.all()]
+        return Response(d, status=status.HTTP_201_CREATED)
+
+    def destroy(self, request, pk=None):
+        from academics.models import GradePolicySet
+        GradePolicySet.objects.filter(pk=pk).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class GradePolicyGradeViewSet(viewsets.ViewSet):
+    permission_classes = [IsAdmin]
+
+    def list(self, request):
+        from academics.models import GradePolicyGrade
+        policy_set_id = request.query_params.get("policy_set_id")
+        qs = GradePolicyGrade.objects.all()
+        if policy_set_id:
+            qs = qs.filter(grade_policy_set_id=policy_set_id)
+        data = [GradePolicyGradeSerializer(g).data for g in qs]
+        return Response(data)
+
+    def create(self, request):
+        from academics.models import GradePolicyGrade
+        serializer = GradePolicyGradeInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        obj = GradePolicyGrade.objects.create(**serializer.validated_data)
+        return Response(GradePolicyGradeSerializer(obj).data, status=status.HTTP_201_CREATED)
+
+    def update(self, request, pk=None):
+        from academics.models import GradePolicyGrade
+        serializer = GradePolicyGradeInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        GradePolicyGrade.objects.filter(pk=pk).update(**serializer.validated_data)
+        obj = GradePolicyGrade.objects.get(pk=pk)
+        return Response(GradePolicyGradeSerializer(obj).data)
+
+    def destroy(self, request, pk=None):
+        from academics.models import GradePolicyGrade
+        GradePolicyGrade.objects.filter(pk=pk).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class PromotionRuleViewSet(viewsets.ViewSet):
+    permission_classes = [IsAdmin]
+
+    def list(self, request):
+        from academics.models import PromotionRule
+        session_id = request.query_params.get("session_id")
+        qs = PromotionRule.objects.select_related("from_class", "to_class", "session")
+        if session_id:
+            qs = qs.filter(session_id=session_id)
+        data = []
+        for r in qs:
+            d = PromotionRuleSerializer(r).data
+            d["from_class_name"] = r.from_class.name
+            d["to_class_name"] = r.to_class.name
+            data.append(d)
+        return Response(data)
+
+    def create(self, request):
+        from academics.models import PromotionRule
+        serializer = PromotionRuleInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        obj = PromotionRule.objects.create(**serializer.validated_data)
+        return Response(PromotionRuleSerializer(obj).data, status=status.HTTP_201_CREATED)
+
+    def update(self, request, pk=None):
+        from academics.models import PromotionRule
+        serializer = PromotionRuleInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        PromotionRule.objects.filter(pk=pk).update(**serializer.validated_data)
+        obj = PromotionRule.objects.get(pk=pk)
+        return Response(PromotionRuleSerializer(obj).data)
+
+    def destroy(self, request, pk=None):
+        from academics.models import PromotionRule
+        PromotionRule.objects.filter(pk=pk).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ReportCardTemplateViewSet(viewsets.ViewSet):
+    permission_classes = [IsAdmin]
+
+    def list(self, request):
+        from academics.models import ReportCardTemplate
+        qs = ReportCardTemplate.objects.all()
+        data = []
+        for t in qs:
+            d = ReportCardTemplateSerializer(t).data
+            d["sections"] = self._get_sections(t.id)
+            d["assignments"] = self._get_assignments(t.id)
+            data.append(d)
         return Response(data)
 
     def retrieve(self, request, pk=None):
-        from academics.models import GradePolicy
-        obj = GradePolicy.objects.filter(id=pk).first()
-        if not obj:
+        from academics.models import ReportCardTemplate
+        try:
+            t = ReportCardTemplate.objects.get(pk=pk)
+        except ReportCardTemplate.DoesNotExist:
             return Response({"detail": "Not found"}, status=status.HTTP_404_NOT_FOUND)
-        return Response(GradePolicyOutputSerializer(obj).data)
+        d = ReportCardTemplateSerializer(t).data
+        d["sections"] = self._get_sections(pk)
+        d["assignments"] = self._get_assignments(pk)
+        return Response(d)
 
     def create(self, request):
-        serializer = GradePolicyInputSerializer(data=request.data)
+        from academics.models import ReportCardTemplate
+        serializer = ReportCardTemplateInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        policy = self.service.upsert_policy(**serializer.validated_data)
-        return Response(
-            GradePolicyOutputSerializer(policy).data,
-            status=status.HTTP_201_CREATED,
-        )
+        obj = ReportCardTemplate.objects.create(**serializer.validated_data)
+        d = ReportCardTemplateSerializer(obj).data
+        d["sections"] = []
+        d["assignments"] = []
+        return Response(d, status=status.HTTP_201_CREATED)
 
     def update(self, request, pk=None):
-        serializer = GradePolicyInputSerializer(data=request.data)
+        from academics.models import ReportCardTemplate
+        serializer = ReportCardTemplateInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        policy = self.service.upsert_policy(**serializer.validated_data)
-        return Response(GradePolicyOutputSerializer(policy).data)
+        ReportCardTemplate.objects.filter(pk=pk).update(**serializer.validated_data)
+        return self.retrieve(request, pk=pk)
 
-    @action(detail=False, methods=["post"], url_path="calculate")
-    def calculate(self, request):
-        percentage = request.data.get("percentage")
-        if percentage is None:
-            return Response(
-                {"detail": "percentage is required."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        label, point = self.service.calculate_grade(float(percentage))
-        return Response({"grade_label": label, "grade_point": point})
+    def destroy(self, request, pk=None):
+        from academics.models import ReportCardTemplate
+        ReportCardTemplate.objects.filter(pk=pk).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=["get", "post"], url_path="sections")
+    def sections(self, request, pk=None):
+        from academics.models import ReportCardSection
+        if request.method == "GET":
+            return Response(self._get_sections(pk))
+        serializer = ReportCardSectionInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        obj = ReportCardSection.objects.create(
+            template_id=pk, **serializer.validated_data
+        )
+        return Response(ReportCardSectionSerializer(obj).data, status=status.HTTP_201_CREATED)
+
+    def _get_sections(self, template_id):
+        from academics.models import ReportCardSection
+        sections = ReportCardSection.objects.filter(template_id=template_id).order_by("display_order")
+        result = []
+        for s in sections:
+            d = ReportCardSectionSerializer(s).data
+            d["subject_groups"] = self._get_subject_groups(s.id)
+            result.append(d)
+        return result
+
+    def _get_subject_groups(self, section_id):
+        from academics.models import ReportCardSectionSubjectGroup
+        groups = ReportCardSectionSubjectGroup.objects.filter(section_id=section_id).order_by("display_order")
+        return [ReportCardSectionSubjectGroupSerializer(g).data for g in groups]
+
+    def _get_assignments(self, template_id):
+        from academics.models import ReportCardTemplateAssignment
+        assignments = ReportCardTemplateAssignment.objects.filter(template_id=template_id)
+        data = []
+        for a in assignments:
+            d = ReportCardTemplateAssignmentSerializer(a).data
+            d["class_name"] = a.class_ref.name if a.class_ref else None
+            d["session_name"] = a.session.name if a.session else None
+            data.append(d)
+        return data
+
+
+class ReportCardSectionViewSet(viewsets.ViewSet):
+    permission_classes = [IsAdmin]
+
+    def update(self, request, pk=None):
+        from academics.models import ReportCardSection
+        serializer = ReportCardSectionInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        ReportCardSection.objects.filter(pk=pk).update(**serializer.validated_data)
+        obj = ReportCardSection.objects.get(pk=pk)
+        return Response(ReportCardSectionSerializer(obj).data)
+
+    def destroy(self, request, pk=None):
+        from academics.models import ReportCardSection
+        ReportCardSection.objects.filter(pk=pk).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=["get", "post"], url_path="subject-groups")
+    def subject_groups(self, request, pk=None):
+        from academics.models import ReportCardSectionSubjectGroup
+        if request.method == "GET":
+            groups = ReportCardSectionSubjectGroup.objects.filter(section_id=pk).order_by("display_order")
+            return Response([ReportCardSectionSubjectGroupSerializer(g).data for g in groups])
+        serializer = ReportCardSectionSubjectGroupInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        obj = ReportCardSectionSubjectGroup.objects.create(section_id=pk, **serializer.validated_data)
+        return Response(ReportCardSectionSubjectGroupSerializer(obj).data, status=status.HTTP_201_CREATED)
+
+
+class ReportCardSectionSubjectGroupViewSet(viewsets.ViewSet):
+    permission_classes = [IsAdmin]
+
+    def destroy(self, request, pk=None):
+        from academics.models import ReportCardSectionSubjectGroup
+        ReportCardSectionSubjectGroup.objects.filter(pk=pk).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ReportCardTemplateAssignmentViewSet(viewsets.ViewSet):
+    permission_classes = [IsAdmin]
+
+    def create(self, request):
+        from academics.models import ReportCardTemplateAssignment
+        serializer = ReportCardTemplateAssignmentInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        obj = ReportCardTemplateAssignment.objects.create(**serializer.validated_data)
+        return Response(ReportCardTemplateAssignmentSerializer(obj).data, status=status.HTTP_201_CREATED)
+
+    def destroy(self, request, pk=None):
+        from academics.models import ReportCardTemplateAssignment
+        ReportCardTemplateAssignment.objects.filter(pk=pk).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class TeacherAssignmentViewSet(viewsets.ViewSet):

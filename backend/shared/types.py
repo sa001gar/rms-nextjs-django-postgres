@@ -63,8 +63,8 @@ class SubjectDTO:
     id: UUID
     name: str
     code: str
-    subject_type: str
-    default_full_marks: int
+    subject_category_id: UUID | None = None
+    subject_category_name: str | None = None
 
 
 @dataclass(frozen=True)

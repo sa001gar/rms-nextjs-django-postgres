@@ -33,18 +33,19 @@ class MarksEntryService(BaseService):
         self,
         enrollment_id: UUID,
         subject_id: UUID,
-        assessment_type_id: UUID,
-        full_marks: int,
+        exam_component_id: UUID,
         obtained_marks: int,
+        is_absent: bool = False,
+        is_grade_only: bool = False,
         entered_by_id: UUID | None = None,
     ) -> MarksEntry:
         """Create a single marks entry with validation."""
-        self._validate_marks(full_marks, obtained_marks)
+        self._validate_marks(obtained_marks)
 
         existing = self.repo.get_entry(
             enrollment_id=enrollment_id,
             subject_id=subject_id,
-            assessment_type_id=assessment_type_id,
+            exam_component_id=exam_component_id,
         )
         if existing:
             self.log.warning(
@@ -53,7 +54,7 @@ class MarksEntryService(BaseService):
                 subject_id=str(subject_id),
             )
             raise ConflictException(
-                "Marks already entered for this enrollment, subject and assessment. "
+                "Marks already entered for this enrollment, subject and exam component. "
                 "Use update instead."
             )
 
@@ -65,9 +66,10 @@ class MarksEntryService(BaseService):
         entry = self.repo.create(
             enrollment_id=enrollment_id,
             subject_id=subject_id,
-            assessment_type_id=assessment_type_id,
-            full_marks=full_marks,
+            exam_component_id=exam_component_id,
             obtained_marks=obtained_marks,
+            is_absent=is_absent,
+            is_grade_only=is_grade_only,
             entered_by_id=entered_by_id,
         )
         AuditLog.log(
@@ -77,7 +79,7 @@ class MarksEntryService(BaseService):
             details={
                 "enrollment_id": str(enrollment_id),
                 "subject_id": str(subject_id),
-                "full_marks": full_marks,
+                "exam_component_id": str(exam_component_id),
                 "obtained_marks": obtained_marks,
             },
         )
@@ -86,32 +88,39 @@ class MarksEntryService(BaseService):
     def update_marks(
         self,
         entry_id: UUID,
-        obtained_marks: int,
+        obtained_marks: int = None,
+        is_absent: bool = None,
+        is_grade_only: bool = None,
     ) -> MarksEntry:
         """Update obtained marks for an existing entry."""
         entry = self.repo.get_by_id_or_raise(entry_id, "Marks entry not found.")
 
-        if obtained_marks < 0 or obtained_marks > entry.full_marks:
+        if obtained_marks is not None and obtained_marks < 0:
             self.log.warning(
                 "marks_entry.validation_failed",
                 entry_id=str(entry_id),
                 obtained=obtained_marks,
-                full=entry.full_marks,
             )
             raise MarksValidationException(
-                f"Obtained marks ({obtained_marks}) must be between 0 and {entry.full_marks}."
+                f"Obtained marks ({obtained_marks}) cannot be negative."
             )
 
         self.log.info("marks_entry.updating", entry_id=str(entry_id))
         old_marks = entry.obtained_marks
-        updated = self.repo.update(entry_id, obtained_marks=obtained_marks)
+        update_kwargs = {}
+        if obtained_marks is not None:
+            update_kwargs["obtained_marks"] = obtained_marks
+        if is_absent is not None:
+            update_kwargs["is_absent"] = is_absent
+        if is_grade_only is not None:
+            update_kwargs["is_grade_only"] = is_grade_only
+        updated = self.repo.update(entry_id, **update_kwargs)
         AuditLog.log(
             action="marks_updated",
             entity_type="MarksEntry",
             entity_id=str(entry_id),
             details={
                 "obtained_marks": f"{old_marks} -> {obtained_marks}",
-                "full_marks": entry.full_marks,
             },
         )
         return updated  # type: ignore[return-value]
@@ -124,7 +133,7 @@ class MarksEntryService(BaseService):
     ) -> list[MarksEntry]:
         """Bulk create or update marks entries."""
         for entry in entries:
-            self._validate_marks(entry["full_marks"], entry["obtained_marks"])
+            self._validate_marks(entry["obtained_marks"])
             entry["entered_by_id"] = entered_by_id
 
         self.log.info("marks_entry.bulk_upsert", count=len(entries))
@@ -186,13 +195,7 @@ class MarksEntryService(BaseService):
         return self.repo.get_for_enrollment(enrollment_id)
 
     @staticmethod
-    def _validate_marks(full_marks: int, obtained_marks: int) -> None:
+    def _validate_marks(obtained_marks: int) -> None:
         """Validate marks constraints."""
-        if full_marks <= 0:
-            raise MarksValidationException("Full marks must be greater than zero.")
         if obtained_marks < 0:
             raise MarksValidationException("Obtained marks cannot be negative.")
-        if obtained_marks > full_marks:
-            raise MarksValidationException(
-                f"Obtained marks ({obtained_marks}) cannot exceed full marks ({full_marks})."
-            )

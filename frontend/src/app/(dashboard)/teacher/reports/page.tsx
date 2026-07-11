@@ -19,9 +19,9 @@ import {
 } from '@/components/ui/table';
 import { useSessions, useActiveSession } from '@/hooks/use-sessions';
 import { useClasses, useSections } from '@/hooks/use-classes';
-import { useClassReportCards, useRankings } from '@/hooks/use-report-card';
+import { useClassReportCards } from '@/hooks/use-report-card';
 import { reportsApi } from '@/lib/api/reports';
-import type { ReportCard, Ranking } from '@/types';
+import type { ReportCardData } from '@/types/report-card';
 
 function gradeVariant(grade: string): 'success' | 'info' | 'warning' | 'danger' {
   const g = grade.toUpperCase();
@@ -41,7 +41,7 @@ export default function TeacherReportsPage() {
   const [selectedClassId, setSelectedClassId] = useState<string>('');
   const [selectedSectionId, setSelectedSectionId] = useState<string>('');
   const [generated, setGenerated] = useState(false);
-  const [selectedStudent, setSelectedStudent] = useState<ReportCard | null>(null);
+  const [selectedStudent, setSelectedStudent] = useState<ReportCardData | null>(null);
   const [pdfDownloading, setPdfDownloading] = useState<string | null>(null);
 
   const { data: sessions, isLoading: sessionsLoading } = useSessions();
@@ -57,13 +57,7 @@ export default function TeacherReportsPage() {
     selectedSectionId
   );
 
-  const { data: rankings, isLoading: rankingsLoading } = useRankings(
-    effectiveSessionId,
-    selectedClassId,
-    selectedSectionId
-  );
-
-  const isLoading = reportCardsLoading || rankingsLoading;
+  const isLoading = reportCardsLoading;
 
   useEffect(() => {
     if (activeSession && !selectedSessionId) {
@@ -89,13 +83,6 @@ export default function TeacherReportsPage() {
     return sections.map((s) => ({ value: s.id, label: s.name }));
   }, [sections]);
 
-  const rankingMap = useMemo(() => {
-    if (!rankings) return new Map<string, Ranking>();
-    const map = new Map<string, Ranking>();
-    rankings.forEach((r) => map.set(r.student.id, r));
-    return map;
-  }, [rankings]);
-
   const sortedReportCards = useMemo(() => {
     if (!reportCards) return [];
     return [...reportCards].sort((a, b) => {
@@ -107,15 +94,15 @@ export default function TeacherReportsPage() {
   }, [reportCards]);
 
   const { subjectColumns, marksheetData } = useMemo(() => {
-    if (!reportCards || !rankings) {
+    if (!reportCards) {
       return { subjectColumns: [], marksheetData: [] };
     }
 
     const subjectMap = new Map<string, SubjectColumn>();
     reportCards.forEach((rc) => {
-      rc.results.forEach((r) => {
-        if (!subjectMap.has(r.subject_name)) {
-          subjectMap.set(r.subject_name, { name: r.subject_name, fullMarks: r.full_marks });
+      rc.subjects.forEach((s) => {
+        if (!subjectMap.has(s.subject_name)) {
+          subjectMap.set(s.subject_name, { name: s.subject_name, fullMarks: s.total_full });
         }
       });
     });
@@ -128,13 +115,10 @@ export default function TeacherReportsPage() {
       return a.student.roll_no.localeCompare(b.student.roll_no);
     });
 
-    const merged = sorted.map((rc) => {
-      const ranking = rankingMap.get(rc.student.id);
-      return { reportCard: rc, ranking };
-    });
+    const merged = sorted.map((rc) => ({ reportCard: rc }));
 
     return { subjectColumns: subjectCols, marksheetData: merged };
-  }, [reportCards, rankings, rankingMap]);
+  }, [reportCards]);
 
   const canGenerate = selectedSessionId && selectedClassId && selectedSectionId;
 
@@ -226,7 +210,7 @@ export default function TeacherReportsPage() {
               <Button
                 onClick={handleGenerate}
                 disabled={!canGenerate || isLoading}
-                isLoading={reportCardsLoading || rankingsLoading}
+                isLoading={reportCardsLoading}
                 className="w-full"
               >
                 <FileText className="h-4 w-4" />
@@ -291,7 +275,6 @@ export default function TeacherReportsPage() {
                       </TableHeader>
                       <TableBody>
                         {sortedReportCards.map((rc, index) => {
-                          const ranking = rankingMap.get(rc.student.id);
                           return (
                             <TableRow
                               key={rc.student.id}
@@ -301,10 +284,10 @@ export default function TeacherReportsPage() {
                               <TableCell className="font-medium">{rc.student.roll_no}</TableCell>
                               <TableCell className="font-medium whitespace-nowrap">{rc.student.name}</TableCell>
                               <TableCell className="text-center">
-                                {rc.summary.total_marks} / {rc.summary.total_full_marks}
+                                {rc.summary.total_marks_obtained} / {rc.summary.total_marks_full}
                               </TableCell>
                               <TableCell className="text-center font-medium">
-                                {rc.summary.percentage.toFixed(1)}%
+                                {rc.summary.overall_percentage?.toFixed(1) ?? '0.0'}%
                               </TableCell>
                               <TableCell className="text-center">
                                 <Badge variant={gradeVariant(rc.summary.overall_grade)}>
@@ -312,7 +295,7 @@ export default function TeacherReportsPage() {
                                 </Badge>
                               </TableCell>
                               <TableCell className="text-center font-bold text-amber-700">
-                                {ranking ? `#${ranking.rank}` : '-'}
+                                {rc.summary.rank_value != null ? `#${rc.summary.rank_value}` : '-'}
                               </TableCell>
                               <TableCell className="text-center">
                                 <Button
@@ -405,7 +388,7 @@ export default function TeacherReportsPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {marksheetData.map(({ reportCard, ranking }, index) => (
+                        {marksheetData.map(({ reportCard }, index) => (
                           <TableRow
                             key={reportCard.student.id}
                             className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}
@@ -417,21 +400,21 @@ export default function TeacherReportsPage() {
                               {reportCard.student.name}
                             </TableCell>
                             {subjectColumns.map((subject) => {
-                              const result = reportCard.results.find(
-                                (r) => r.subject_name === subject.name
+                              const sr = reportCard.subjects.find(
+                                (s) => s.subject_name === subject.name
                               );
                               return (
                                 <Fragment key={`${reportCard.student.id}-${subject.name}`}>
                                   <TableCell className="text-center border-x border-gray-200">
-                                    {result ? result.marks_obtained : '-'}
+                                    {sr ? sr.total_obtained : '-'}
                                   </TableCell>
                                   <TableCell className="text-center border-r border-gray-200 text-gray-500">
-                                    {result ? result.full_marks : '-'}
+                                    {sr ? sr.total_full : '-'}
                                   </TableCell>
                                   <TableCell className="text-center border-r border-gray-200">
-                                    {result ? (
-                                      <Badge variant={gradeVariant(result.grade)} className="text-xs">
-                                        {result.grade}
+                                    {sr ? (
+                                      <Badge variant={gradeVariant(sr.overall_grade)} className="text-xs">
+                                        {sr.overall_grade}
                                       </Badge>
                                     ) : (
                                       '-'
@@ -441,13 +424,13 @@ export default function TeacherReportsPage() {
                               );
                             })}
                             <TableCell className="text-center font-semibold border-l border-gray-200 bg-amber-50/50">
-                              {reportCard.summary.total_marks}
+                              {reportCard.summary.total_marks_obtained}
                             </TableCell>
                             <TableCell className="text-center text-gray-500 bg-amber-50/50">
-                              {reportCard.summary.total_full_marks}
+                              {reportCard.summary.total_marks_full}
                             </TableCell>
                             <TableCell className="text-center font-medium bg-amber-50/50">
-                              {reportCard.summary.percentage.toFixed(1)}%
+                              {reportCard.summary.overall_percentage?.toFixed(1) ?? '0.0'}%
                             </TableCell>
                             <TableCell className="text-center bg-amber-50/50">
                               <Badge variant={gradeVariant(reportCard.summary.overall_grade)}>
@@ -455,7 +438,7 @@ export default function TeacherReportsPage() {
                               </Badge>
                             </TableCell>
                             <TableCell className="text-center font-bold text-amber-700 bg-amber-50/50">
-                              {ranking ? `#${ranking.rank}` : '-'}
+                              {reportCard.summary.rank_value != null ? `#${reportCard.summary.rank_value}` : '-'}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -489,11 +472,11 @@ export default function TeacherReportsPage() {
               </div>
               <div>
                 <span className="text-gray-500">Class</span>
-                <p className="font-medium text-gray-900">{selectedStudent.student.class}</p>
+                <p className="font-medium text-gray-900">{selectedStudent.student.class_name}</p>
               </div>
               <div>
                 <span className="text-gray-500">Section</span>
-                <p className="font-medium text-gray-900">{selectedStudent.student.section}</p>
+                <p className="font-medium text-gray-900">{selectedStudent.student.section_name}</p>
               </div>
             </div>
 
@@ -507,13 +490,13 @@ export default function TeacherReportsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {selectedStudent.results.map((r, i) => (
+                {selectedStudent.subjects.map((s, i) => (
                   <TableRow key={i}>
-                    <TableCell className="font-medium">{r.subject_name}</TableCell>
-                    <TableCell className="text-right">{r.marks_obtained}</TableCell>
-                    <TableCell className="text-right">{r.full_marks}</TableCell>
+                    <TableCell className="font-medium">{s.subject_name}</TableCell>
+                    <TableCell className="text-right">{s.total_obtained}</TableCell>
+                    <TableCell className="text-right">{s.total_full}</TableCell>
                     <TableCell className="text-center">
-                      <Badge variant={gradeVariant(r.grade)}>{r.grade}</Badge>
+                      <Badge variant={gradeVariant(s.overall_grade)}>{s.overall_grade}</Badge>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -524,16 +507,16 @@ export default function TeacherReportsPage() {
               <div className="rounded-lg border border-gray-200 p-4">
                 <p className="text-sm text-gray-500">Total Marks</p>
                 <p className="mt-1 text-2xl font-semibold text-gray-900">
-                  {selectedStudent.summary.total_marks}{' '}
+                  {selectedStudent.summary.total_marks_obtained}{' '}
                   <span className="text-sm font-normal text-gray-400">
-                    / {selectedStudent.summary.total_full_marks}
+                    / {selectedStudent.summary.total_marks_full}
                   </span>
                 </p>
               </div>
               <div className="rounded-lg border border-gray-200 p-4">
                 <p className="text-sm text-gray-500">Percentage</p>
                 <p className="mt-1 text-2xl font-semibold text-gray-900">
-                  {selectedStudent.summary.percentage.toFixed(1)}%
+                  {selectedStudent.summary.overall_percentage?.toFixed(1) ?? '0.0'}%
                 </p>
               </div>
               <div className="rounded-lg border border-gray-200 p-4">
@@ -544,11 +527,11 @@ export default function TeacherReportsPage() {
                   </Badge>
                 </div>
               </div>
-              {selectedStudent.summary.rank != null && (
+              {selectedStudent.summary.rank_value != null && (
                 <div className="rounded-lg border border-gray-200 p-4">
                   <p className="text-sm text-gray-500">Rank</p>
                   <p className="mt-1 text-2xl font-semibold text-gray-900">
-                    #{selectedStudent.summary.rank}
+                    #{selectedStudent.summary.rank_value}
                   </p>
                 </div>
               )}

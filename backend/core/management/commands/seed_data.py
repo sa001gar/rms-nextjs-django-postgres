@@ -82,61 +82,82 @@ class Command(BaseCommand):
                     name=section_name, class_ref=cls
                 )
 
+        # Create subject categories
+        from academics.models import SubjectCategory
+        cat_scholastic, _ = SubjectCategory.objects.get_or_create(
+            code="scholastic",
+            defaults={"name": "Scholastic", "is_scholastic": True, "display_order": 1},
+        )
+        cat_optional, _ = SubjectCategory.objects.get_or_create(
+            code="optional",
+            defaults={"name": "Optional", "is_scholastic": True, "display_order": 2},
+        )
+        cat_cocurricular, _ = SubjectCategory.objects.get_or_create(
+            code="cocurricular",
+            defaults={"name": "Co-Scholastic", "is_scholastic": False, "display_order": 3},
+        )
+
         # Create subjects
         from academics.models import Subject
         subjects_data = [
-            ("Mathematics", "MATH", "core", 100),
-            ("English", "ENG", "core", 100),
-            ("Science", "SCI", "core", 100),
-            ("Social Studies", "SST", "core", 100),
-            ("Hindi", "HIN", "core", 100),
-            ("Computer Science", "CS", "optional", 50),
-            ("Physical Education", "PE", "cocurricular", 50),
-            ("Art", "ART", "cocurricular", 50),
+            ("Mathematics", "MATH", cat_scholastic),
+            ("English", "ENG", cat_scholastic),
+            ("Science", "SCI", cat_scholastic),
+            ("Social Studies", "SST", cat_scholastic),
+            ("Hindi", "HIN", cat_scholastic),
+            ("Computer Science", "CS", cat_optional),
+            ("Physical Education", "PE", cat_cocurricular),
+            ("Art", "ART", cat_cocurricular),
         ]
-        for name, code, stype, fm in subjects_data:
+        for name, code, cat in subjects_data:
             Subject.objects.get_or_create(
                 code=code,
-                defaults={"name": name, "subject_type": stype, "default_full_marks": fm},
+                defaults={"name": name, "subject_category": cat},
             )
 
-        # Create assessment types
-        from academics.models import AssessmentType
-        assessments = [
-            ("Unit Test 1", "UT1", "summative", 1),
-            ("Unit Test 2", "UT2", "summative", 2),
-            ("Mid-Term Exam", "MID", "summative", 3),
-            ("Assignment 1", "AS1", "formative", 4),
-            ("Assignment 2", "AS2", "formative", 5),
-            ("Final Exam", "FINAL", "summative", 6),
-            ("Project", "PROJ", "project", 7),
-            ("Practical", "PRA", "practical", 8),
-        ]
-        for name, code, cat, order in assessments:
-            AssessmentType.objects.get_or_create(
-                code=code,
-                defaults={"name": name, "category": cat, "display_order": order},
-            )
+        # Create exams and exam components
+        from academics.models import Exam, ExamComponent
 
-        # Create grade policies
-        from academics.models import GradePolicy
+        term1_exam, _ = Exam.objects.get_or_create(
+            session=session, name="First Term",
+            defaults={"display_order": 1},
+        )
+        term2_exam, _ = Exam.objects.get_or_create(
+            session=session, name="Second Term",
+            defaults={"display_order": 2},
+        )
+
+        for exam, components in [
+            (term1_exam, [("MTT1", 20, 1), ("TERM1", 80, 2)]),
+            (term2_exam, [("MTT2", 20, 1), ("TERM2", 80, 2)]),
+        ]:
+            for name, full_marks, order in components:
+                ExamComponent.objects.get_or_create(
+                    exam=exam, parent=None, name=name,
+                    defaults={"code": name, "full_marks": full_marks, "display_order": order},
+                )
+
+        # Create grade policy set
+        from academics.models import GradePolicySet, GradePolicyGrade
+        policy_set, _ = GradePolicySet.objects.get_or_create(
+            session=session, name="Default",
+            defaults={"is_active": True},
+        )
         grades = [
-            ("AA", 90, 100, 4.0, 1),
-            ("A+", 75, 89.99, 3.5, 2),
-            ("A", 60, 74.99, 3.0, 3),
-            ("B+", 45, 59.99, 2.5, 4),
-            ("B", 34, 44.99, 2.0, 5),
-            ("C", 25, 33.99, 1.0, 6),
-            ("F", 0, 24.99, 0.0, 7),
+            ("AA", 90, 100, 10.0, 1),
+            ("A+", 75, 89.99, 9.0, 2),
+            ("A", 60, 74.99, 8.0, 3),
+            ("B+", 45, 59.99, 7.0, 4),
+            ("B", 33, 44.99, 6.0, 5),
+            ("C", 20, 32.99, 4.0, 6),
+            ("D", 0, 19.99, 2.0, 7),
         ]
         for label, min_p, max_p, gp, order in grades:
-            GradePolicy.objects.get_or_create(
-                grade_label=label,
+            GradePolicyGrade.objects.get_or_create(
+                grade_policy_set=policy_set, grade_label=label,
                 defaults={
-                    "min_percentage": min_p,
-                    "max_percentage": max_p,
-                    "grade_point": gp,
-                    "display_order": order,
+                    "min_percentage": min_p, "max_percentage": max_p,
+                    "grade_point": gp, "display_order": order,
                 },
             )
 

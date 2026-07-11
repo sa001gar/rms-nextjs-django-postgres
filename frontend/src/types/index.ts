@@ -15,6 +15,7 @@ export type {
   ClassSubject,
   AssessmentType,
   AssessmentWeightage,
+  SubjectCategory,
   GradePolicy,
 } from './academic';
 

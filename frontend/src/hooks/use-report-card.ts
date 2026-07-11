@@ -1,39 +1,28 @@
 import { useQuery } from '@tanstack/react-query';
-import { reportsApi } from '@/lib/api/reports';
-import { queryKeys } from './use-sessions';
+import { reportCardApi } from '@/lib/api/report-card';
 
-export function useReportCard(studentId: string, sessionId?: string) {
+export function useReportCard(
+  userId: string,
+  sessionId?: string,
+  templateId?: string
+) {
   return useQuery({
-    queryKey: queryKeys.marksheet(studentId, sessionId),
-    queryFn: () => reportsApi.getReportCard(studentId, sessionId),
-    enabled: !!studentId,
+    queryKey: ['report-card', userId, sessionId, templateId],
+    queryFn: () => reportCardApi.getByUserId(userId, sessionId, templateId),
+    enabled: !!userId,
     staleTime: 60 * 1000,
   });
 }
 
-export function useClassReportCards(sessionId: string, classId: string, sectionId: string) {
+export function useClassReportCards(
+  classId: string,
+  sectionId: string,
+  sessionId: string
+) {
   return useQuery({
-    queryKey: ['report-cards', sessionId, classId, sectionId],
-    queryFn: () => reportsApi.getClassReportCards(sessionId, classId, sectionId),
-    enabled: !!sessionId && !!classId && !!sectionId,
-    staleTime: 60 * 1000,
-  });
-}
-
-export function useMarksheet(studentId: string, sessionId?: string) {
-  return useQuery({
-    queryKey: ['marksheet', studentId, sessionId],
-    queryFn: () => reportsApi.getMarksheet(studentId, sessionId),
-    enabled: !!studentId,
-    staleTime: 60 * 1000,
-  });
-}
-
-export function useRankings(sessionId: string, classId: string, sectionId: string) {
-  return useQuery({
-    queryKey: ['rankings', sessionId, classId, sectionId],
-    queryFn: () => reportsApi.getRankings(sessionId, classId, sectionId),
-    enabled: !!sessionId && !!classId && !!sectionId,
+    queryKey: ['report-cards', classId, sectionId, sessionId],
+    queryFn: () => reportCardApi.getClassReportCards(classId, sectionId, sessionId),
+    enabled: !!classId && !!sectionId && !!sessionId,
     staleTime: 60 * 1000,
   });
 }

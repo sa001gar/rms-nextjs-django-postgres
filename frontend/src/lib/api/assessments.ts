@@ -5,6 +5,7 @@ export interface AssessmentCategory {
   name: string;
   code: string;
   category: string;
+  term?: { id: string; name: string } | null;
   display_order: number;
   is_active: boolean;
   created_at: string;

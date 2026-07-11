@@ -3,7 +3,8 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-from reporting.api.views import ReportCardViewSet, MarksheetViewSet, RankingViewSet
+from reporting.api.views import MarksheetViewSet, RankingViewSet
+from reporting.api.report_card_views import ReportCardViewSet
 from reporting.api.export_views import (
     PDFReportCardView,
     PDFClassReportCardsView,

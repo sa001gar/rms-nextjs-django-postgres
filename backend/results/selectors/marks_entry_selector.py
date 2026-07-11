@@ -21,29 +21,29 @@ class MarksEntrySelector(BaseSelector):
                 enrollment_id__in=enrollment_ids,
                 subject_id=subject_id,
             )
-            .select_related("enrollment__student", "assessment_type", "entered_by")
-            .order_by("enrollment__roll_no", "assessment_type__display_order")
+            .select_related("enrollment__student", "exam_component", "entered_by")
+            .order_by("enrollment__roll_no", "exam_component__display_order")
         )
 
     def get_entry(
         self,
         enrollment_id: UUID,
         subject_id: UUID,
-        assessment_type_id: UUID,
+        exam_component_id: UUID,
     ) -> MarksEntry | None:
         return (
             MarksEntry.objects.filter(
                 enrollment_id=enrollment_id,
                 subject_id=subject_id,
-                assessment_type_id=assessment_type_id,
+                exam_component_id=exam_component_id,
             )
-            .select_related("subject", "assessment_type", "entered_by")
+            .select_related("subject", "exam_component", "entered_by")
             .first()
         )
 
     def list_for_enrollment(self, enrollment_id: UUID) -> QuerySet[MarksEntry]:
         return (
             MarksEntry.objects.filter(enrollment_id=enrollment_id)
-            .select_related("subject", "assessment_type", "entered_by")
-            .order_by("subject__code", "assessment_type__display_order")
+            .select_related("subject", "exam_component", "entered_by")
+            .order_by("subject__code", "exam_component__display_order")
         )

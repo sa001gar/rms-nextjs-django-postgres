@@ -16,8 +16,7 @@ import {
 } from '@/components/ui/table';
 import { useSessions, useActiveSession } from '@/hooks/use-sessions';
 import { useClasses, useSections } from '@/hooks/use-classes';
-import { useClassReportCards, useRankings } from '@/hooks/use-report-card';
-import type { Ranking } from '@/types';
+import { useClassReportCards } from '@/hooks/use-report-card';
 
 interface SubjectColumn {
   name: string;
@@ -43,13 +42,7 @@ export function MarksheetPreview() {
     selectedSectionId
   );
 
-  const { data: rankings, isLoading: rankingsLoading } = useRankings(
-    effectiveSessionId,
-    selectedClassId,
-    selectedSectionId
-  );
-
-  const isLoading = sessionsLoading || classesLoading || sectionsLoading || reportCardsLoading || rankingsLoading;
+  const isLoading = sessionsLoading || classesLoading || sectionsLoading || reportCardsLoading;
 
   useEffect(() => {
     if (activeSession && !selectedSessionId) {
@@ -76,22 +69,19 @@ export function MarksheetPreview() {
   }, [sections]);
 
   const { subjectColumns, mergedData } = useMemo(() => {
-    if (!reportCards || !rankings) {
+    if (!reportCards) {
       return { subjectColumns: [], mergedData: [] };
     }
 
     const subjectMap = new Map<string, SubjectColumn>();
     reportCards.forEach((rc) => {
-      rc.results.forEach((r) => {
-        if (!subjectMap.has(r.subject_name)) {
-          subjectMap.set(r.subject_name, { name: r.subject_name, fullMarks: r.full_marks });
+      rc.subjects.forEach((s) => {
+        if (!subjectMap.has(s.subject_name)) {
+          subjectMap.set(s.subject_name, { name: s.subject_name, fullMarks: s.total_full });
         }
       });
     });
     const subjectCols = Array.from(subjectMap.values());
-
-    const rankingMap = new Map<string, Ranking>();
-    rankings.forEach((r) => rankingMap.set(r.student.id, r));
 
     const sorted = [...reportCards].sort((a, b) => {
       const rollA = parseInt(a.student.roll_no, 10);
@@ -100,13 +90,10 @@ export function MarksheetPreview() {
       return a.student.roll_no.localeCompare(b.student.roll_no);
     });
 
-    const merged = sorted.map((rc) => {
-      const ranking = rankingMap.get(rc.student.id);
-      return { reportCard: rc, ranking };
-    });
+    const merged = sorted.map((rc) => ({ reportCard: rc }));
 
     return { subjectColumns: subjectCols, mergedData: merged };
-  }, [reportCards, rankings]);
+  }, [reportCards]);
 
   const canGenerate = selectedSessionId && selectedClassId && selectedSectionId;
 
@@ -190,7 +177,7 @@ export function MarksheetPreview() {
               <Button
                 onClick={handleGenerate}
                 disabled={!canGenerate || isLoading}
-                isLoading={reportCardsLoading || rankingsLoading}
+                isLoading={reportCardsLoading}
                 className="w-full"
               >
                 <FileText className="h-4 w-4" />
@@ -284,7 +271,7 @@ export function MarksheetPreview() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {mergedData.map(({ reportCard, ranking }, index) => (
+                  {mergedData.map(({ reportCard }, index) => (
                     <TableRow
                       key={reportCard.student.id}
                       className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}
@@ -296,31 +283,31 @@ export function MarksheetPreview() {
                         {reportCard.student.name}
                       </TableCell>
                       {subjectColumns.map((subject) => {
-                        const result = reportCard.results.find(
-                          (r) => r.subject_name === subject.name
+                        const sr = reportCard.subjects.find(
+                          (s) => s.subject_name === subject.name
                         );
                         return (
                           <Fragment key={`${reportCard.student.id}-${subject.name}`}>
                             <TableCell className="text-center border-x border-gray-200">
-                              {result ? result.marks_obtained : '-'}
+                              {sr ? sr.total_obtained : '-'}
                             </TableCell>
                             <TableCell className="text-center border-r border-gray-200 text-gray-500">
-                              {result ? result.full_marks : '-'}
+                              {sr ? sr.total_full : '-'}
                             </TableCell>
                             <TableCell className="text-center border-r border-gray-200">
-                              {result ? (
+                              {sr ? (
                                 <span
                                   className={`inline-block rounded px-1.5 py-0.5 text-xs font-medium ${
-                                    result.grade === 'A+' || result.grade === 'A'
+                                    sr.overall_grade === 'A+' || sr.overall_grade === 'A'
                                       ? 'bg-green-100 text-green-800'
-                                      : result.grade === 'B+' || result.grade === 'B'
+                                      : sr.overall_grade === 'B+' || sr.overall_grade === 'B'
                                       ? 'bg-blue-100 text-blue-800'
-                                      : result.grade === 'C'
+                                      : sr.overall_grade === 'C'
                                       ? 'bg-yellow-100 text-yellow-800'
                                       : 'bg-red-100 text-red-800'
                                   }`}
                                 >
-                                  {result.grade}
+                                  {sr.overall_grade}
                                 </span>
                               ) : (
                                 '-'
@@ -330,13 +317,13 @@ export function MarksheetPreview() {
                         );
                       })}
                       <TableCell className="text-center font-semibold border-l border-gray-200 bg-amber-50/50">
-                        {reportCard.summary.total_marks}
+                        {reportCard.summary.total_marks_obtained}
                       </TableCell>
                       <TableCell className="text-center text-gray-500 bg-amber-50/50">
-                        {reportCard.summary.total_full_marks}
+                        {reportCard.summary.total_marks_full}
                       </TableCell>
                       <TableCell className="text-center font-medium bg-amber-50/50">
-                        {reportCard.summary.percentage.toFixed(1)}%
+                        {reportCard.summary.overall_percentage?.toFixed(1) ?? '0.0'}%
                       </TableCell>
                       <TableCell className="text-center bg-amber-50/50">
                         <span
@@ -356,7 +343,7 @@ export function MarksheetPreview() {
                         </span>
                       </TableCell>
                       <TableCell className="text-center font-bold text-amber-700 bg-amber-50/50">
-                        {ranking ? ranking.rank : '-'}
+                        {reportCard.summary.rank_value ?? '-'}
                       </TableCell>
                     </TableRow>
                   ))}

@@ -38,8 +38,8 @@ class MarksheetService(BaseService):
 
         marks_entries = list(
             MarksEntry.objects.filter(enrollment=enrollment)
-            .select_related("subject", "assessment_type")
-            .order_by("subject__code", "assessment_type__display_order")
+            .select_related("subject", "exam_component", "exam_component__exam")
+            .order_by("subject__code", "exam_component__display_order")
         )
 
         subjects_map: dict[UUID, dict] = {}
@@ -53,8 +53,9 @@ class MarksheetService(BaseService):
                     "assessments": [],
                 }
             subjects_map[sub_id]["assessments"].append({
-                "assessment_type": entry.assessment_type.name,
-                "full_marks": entry.full_marks,
+                "assessment_type": entry.exam_component.name,
+                "exam": entry.exam_component.exam.name if entry.exam_component.exam else "",
+                "full_marks": entry.exam_component.full_marks,
                 "obtained_marks": entry.obtained_marks,
             })
 
@@ -80,12 +81,12 @@ class MarksheetService(BaseService):
         cocurricular = [
             {
                 "subject_name": entry.subject.name,
-                "assessment_type": entry.assessment_type.name,
+                "assessment_type": entry.exam_component.name,
                 "obtained_marks": entry.obtained_marks,
-                "full_marks": entry.full_marks,
+                "full_marks": entry.exam_component.full_marks,
             }
             for entry in marks_entries
-            if entry.subject.subject_type == "cocurricular"
+            if entry.subject.subject_category and entry.subject.subject_category.code == "cocurricular"
         ]
 
         marksheet = MarksheetDTO(

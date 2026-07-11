@@ -7,10 +7,19 @@ from academics.api.views import (
     AcademicSessionViewSet,
     ClassViewSet,
     SubjectViewSet,
-    AssessmentTypeViewSet,
-    GradePolicyViewSet,
     TeacherAssignmentViewSet,
+    ExamViewSet,
+    ExamComponentViewSet,
+    SubjectAssessmentSchemeViewSet,
+    GradePolicySetViewSet,
+    GradePolicyGradeViewSet,
+    PromotionRuleViewSet,
+    ReportCardTemplateViewSet,
     TermViewSet,
+    SubjectCategoryViewSet,
+    ReportCardSectionViewSet,
+    ReportCardSectionSubjectGroupViewSet,
+    ReportCardTemplateAssignmentViewSet,
     MarksDistributionViewSet,
 )
 
@@ -19,11 +28,20 @@ router.register(r"sessions", AcademicSessionViewSet, basename="sessions")
 router.register(r"terms", TermViewSet, basename="terms")
 router.register(r"classes", ClassViewSet, basename="classes")
 router.register(r"subjects", SubjectViewSet, basename="subjects")
-router.register(r"assessment-types", AssessmentTypeViewSet, basename="assessment-types")
-router.register(r"grade-policies", GradePolicyViewSet, basename="grade-policies")
+router.register(r"subject-categories", SubjectCategoryViewSet, basename="subject-categories")
 router.register(r"teacher-assignments", TeacherAssignmentViewSet, basename="teacher-assignments")
-router.register(r"marks-distribution", MarksDistributionViewSet, basename="marks-distribution")
+router.register(r"exams", ExamViewSet, basename="exams")
+router.register(r"exam-components", ExamComponentViewSet, basename="exam-components")
+router.register(r"subject-assessment-schemes", SubjectAssessmentSchemeViewSet, basename="subject-assessment-schemes")
+router.register(r"grade-policy-sets", GradePolicySetViewSet, basename="grade-policy-sets")
+router.register(r"grade-policy-grades", GradePolicyGradeViewSet, basename="grade-policy-grades")
+router.register(r"promotion-rules", PromotionRuleViewSet, basename="promotion-rules")
+router.register(r"report-card-templates", ReportCardTemplateViewSet, basename="report-card-templates")
+router.register(r"report-card-sections", ReportCardSectionViewSet, basename="report-card-sections")
+router.register(r"report-card-section-subject-groups", ReportCardSectionSubjectGroupViewSet, basename="report-card-section-subject-groups")
+router.register(r"report-card-template-assignments", ReportCardTemplateAssignmentViewSet, basename="report-card-template-assignments")
 
 urlpatterns = [
     path("", include(router.urls)),
+    path("marks-distribution/", MarksDistributionViewSet.as_view({"get": "list", "post": "bulk_save"})),
 ]
