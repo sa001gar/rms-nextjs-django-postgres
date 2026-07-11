@@ -1,5 +1,6 @@
 """Audit log and notification models."""
 
+import typing
 import uuid
 from django.db import models
 from django.utils import timezone
@@ -34,6 +35,7 @@ class AuditLog(models.Model):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    objects = models.Manager()
     user = models.ForeignKey(
         "core.User",
         on_delete=models.SET_NULL,
@@ -63,13 +65,13 @@ class AuditLog(models.Model):
         return f"{self.action} by {self.user} at {self.created_at}"
 
     @classmethod
-    def log(cls, action: str, user=None, entity_type: str = "", entity_id: str = "",
-            details: dict = None, ip_address: str = None, user_agent: str = "") -> "AuditLog":
+    def log(cls, action: str, user: typing.Any = None, entity_type: str = "", entity_id: str = "",
+            details: typing.Dict[str, typing.Any] | None = None, ip_address: str | None = None, user_agent: str = "") -> "AuditLog":
         return cls.objects.create(
             action=action,
             user=user,
             entity_type=entity_type,
-            entity_id=str(entity_id),
+            entity_id=entity_id,
             details=details or {},
             ip_address=ip_address,
             user_agent=user_agent,
@@ -89,6 +91,7 @@ class Notification(models.Model):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    objects = models.Manager()
     user = models.ForeignKey(
         "core.User",
         on_delete=models.CASCADE,
@@ -112,7 +115,7 @@ class Notification(models.Model):
         return f"{self.title} -> {self.user}"
 
     @classmethod
-    def create_notification(cls, user, notification_type: str, title: str,
+    def create_notification(cls, user: typing.Any, notification_type: str, title: str,
                             message: str, link: str = "") -> "Notification":
         return cls.objects.create(
             user=user,

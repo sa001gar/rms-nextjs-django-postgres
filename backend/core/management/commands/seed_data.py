@@ -3,6 +3,7 @@
 from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
 
+
 User = get_user_model()
 
 
@@ -27,7 +28,7 @@ class Command(BaseCommand):
         if created:
             admin.set_password("admin123")
             admin.save()
-            self.stdout.write(self.style.SUCCESS(f"Created admin: admin@school.com / admin123"))
+            self.stdout.write(self.style.SUCCESS(f"Created admin: admin@school.com / admin123"))  # type: ignore
 
             from identity.models import AdminProfile
             AdminProfile.objects.get_or_create(
@@ -47,7 +48,7 @@ class Command(BaseCommand):
         if created:
             teacher.set_password("teacher123")
             teacher.save()
-            self.stdout.write(self.style.SUCCESS(f"Created teacher: teacher@school.com / teacher123"))
+            self.stdout.write(self.style.SUCCESS(f"Created teacher: teacher@school.com / teacher123"))  # type: ignore
 
             from identity.models import TeacherProfile
             TeacherProfile.objects.get_or_create(
@@ -65,7 +66,7 @@ class Command(BaseCommand):
             },
         )
         if created:
-            self.stdout.write(self.style.SUCCESS(f"Created session: 2025-2026"))
+            self.stdout.write(self.style.SUCCESS(f"Created session: 2025-2026"))  # type: ignore
 
         # Create classes
         from academics.models import Class, Section
@@ -144,41 +145,42 @@ class Command(BaseCommand):
         from academics.models import Class, Section
 
         students_data = [
-            ("Rahul Sharma", "2005-03-15", "Rajesh Sharma", "Priya Sharma", "9876543210", "Class 10", "A"),
-            ("Priya Patel", "2005-07-22", "Amit Patel", "Sunita Patel", "9876543211", "Class 10", "A"),
-            ("Amit Kumar", "2005-01-10", "Vijay Kumar", "Meena Kumar", "9876543212", "Class 10", "B"),
-            ("Sneha Singh", "2005-11-05", "Ravi Singh", "Kavita Singh", "9876543213", "Class 10", "B"),
-            ("Rohan Gupta", "2005-09-18", "Anil Gupta", "Ritu Gupta", "9876543214", "Class 9", "A"),
+            ("Rahul Sharma", "2005-03-15", "Rajesh Sharma", "Priya Sharma", "9876543210", "Class 10", "A", "REG2025001", "101"),
+            ("Priya Patel", "2005-07-22", "Amit Patel", "Sunita Patel", "9876543211", "Class 10", "A", "REG2025002", "102"),
+            ("Amit Kumar", "2005-01-10", "Vijay Kumar", "Meena Kumar", "9876543212", "Class 10", "B", "REG2025003", "101"),
+            ("Sneha Singh", "2005-11-05", "Ravi Singh", "Kavita Singh", "9876543213", "Class 10", "B", "REG2025004", "102"),
+            ("Rohan Gupta", "2005-09-18", "Anil Gupta", "Ritu Gupta", "9876543214", "Class 9", "A", "REG2025005", "901"),
         ]
 
-        for name, dob, father, mother, phone, class_name, section_name in students_data:
-            student_id = Student.generate_student_id()
-            user_email = f"{student_id.lower()}@student.local"
+        for name, dob, father, mother, phone, class_name, section_name, reg_num, roll_no in students_data:
+            user_email = f"{reg_num.lower()}@student.local"
 
             user, created = User.objects.get_or_create(
                 email=user_email,
                 defaults={
-                    "username": student_id.lower(),
+                    "username": reg_num.lower(),
                     "role": "student",
                     "first_name": name.split()[0],
                     "last_name": " ".join(name.split()[1:]),
                 },
             )
-            if created:
-                # Set default password from DOB
+            if created or not created: # Proceed whether created or not
                 from datetime import datetime
                 dob_date = datetime.strptime(dob, "%Y-%m-%d").date()
                 default_password = dob_date.strftime("%d%m%Y")
-                user.set_password(default_password)
-                user.save()
+                
+                if created:
+                    user.set_password(default_password)
+                    user.save()
 
                 cls = Class.objects.filter(name=class_name).first()
                 section = Section.objects.filter(name=section_name, class_ref=cls).first() if cls else None
 
-                student, _ = Student.objects.get_or_create(
-                    user=user,
+                student, student_created = Student.objects.get_or_create(
+                    registration_number=reg_num,
                     defaults={
-                        "student_id": student_id,
+                        "user": user,
+                        "student_id": Student.generate_student_id(),
                         "name": name,
                         "date_of_birth": dob,
                         "father_name": father,
@@ -188,8 +190,23 @@ class Command(BaseCommand):
                         "admission_session": session,
                     },
                 )
-                self.stdout.write(self.style.SUCCESS(
-                    f"Created student: {name} ({student_id}) / {default_password}"
-                ))
 
-        self.stdout.write(self.style.SUCCESS("Development data seeded successfully!"))
+                if student_created and cls and section and session:
+                    from enrollments.models import Enrollment
+                    Enrollment.objects.get_or_create(
+                        student=student,
+                        session=session,
+                        defaults={
+                            "class_field": cls,
+                            "section": section,
+                            "roll_no": roll_no,
+                            "status": "active",
+                        }
+                    )
+
+                if student_created:
+                    self.stdout.write(self.style.SUCCESS(  # type: ignore
+                        f"Created student: {name} ({student.student_id}) / {default_password}"
+                    ))
+
+        self.stdout.write(self.style.SUCCESS("Development data seeded successfully!"))  # type: ignore

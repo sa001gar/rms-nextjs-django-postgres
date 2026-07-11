@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { redirect } from 'next/navigation';
 import { useAuthStore, useIsHydrated } from '@/stores/auth-store';
 import { clearTokens } from '@/lib/api/client';
 import { Sidebar } from '@/components/layout/sidebar';
@@ -41,21 +40,16 @@ const navItems = [
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
-  const { user, isAuthenticated, logout } = useAuthStore();
+  const { user, isAuthenticated } = useAuthStore();
   const isHydrated = useIsHydrated();
-  const [isValidating, setIsValidating] = useState(true);
 
-  useEffect(() => {
-    if (!isHydrated) return;
-    if (!isAuthenticated || user?.role !== 'admin') {
-      router.push('/login/admin');
-      return;
-    }
-    setIsValidating(false);
-  }, [isHydrated, isAuthenticated, user?.role]);
+  if (!isHydrated) {
+    return <Loading message="Verifying session..." />;
+  }
 
-  if (!isHydrated || isValidating) return <Loading message="Verifying session..." />;
+  if (!isAuthenticated || user?.role !== 'admin') {
+    redirect('/login/admin');
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

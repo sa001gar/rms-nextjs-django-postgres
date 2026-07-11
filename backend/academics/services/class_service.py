@@ -47,14 +47,14 @@ class ClassService(BaseService):
 
     def create_section(self, class_id: UUID, name: str) -> Section:
         self.repo.get_by_id_or_raise(class_id, "Class not found.")
-        existing = Section.objects.filter(class_id=class_id, name=name).first()
+        existing = Section.objects.filter(class_ref_id=class_id, name=name).first()
         if existing:
             raise ConflictException(
                 f"Section '{name}' already exists in this class."
             )
         self.log.info("section.create", class_id=str(class_id), name=name)
-        return Section.objects.create(class_id=class_id, name=name)
+        return Section.objects.create(class_ref_id=class_id, name=name)
 
     def list_sections(self, class_id: UUID) -> QuerySet[Section]:
         self.repo.get_by_id_or_raise(class_id, "Class not found.")
-        return Section.objects.filter(class_id=class_id).order_by("name")
+        return Section.objects.filter(class_ref_id=class_id).order_by("name")

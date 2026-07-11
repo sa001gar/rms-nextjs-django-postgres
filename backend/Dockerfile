@@ -66,7 +66,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
 CMD ["gunicorn", "config.wsgi:application", \
      "--bind", "0.0.0.0:8000", \
      "--workers", "4", \
-     "--worker-class", "uvicorn.workers.UvicornWorker", \
      "--timeout", "120", \
      "--access-logfile", "-", \
      "--error-logfile", "-"]

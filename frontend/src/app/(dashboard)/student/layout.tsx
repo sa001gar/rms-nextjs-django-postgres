@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { redirect } from 'next/navigation';
 import { useAuthStore, useIsHydrated } from '@/stores/auth-store';
 import { clearTokens } from '@/lib/api/client';
 import { Sidebar } from '@/components/layout/sidebar';
@@ -17,21 +16,16 @@ const navItems = [
 ];
 
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
-  const { student, isAuthenticated, logout } = useAuthStore();
+  const { student, isAuthenticated } = useAuthStore();
   const isHydrated = useIsHydrated();
-  const [isValidating, setIsValidating] = useState(true);
 
-  useEffect(() => {
-    if (!isHydrated) return;
-    if (!isAuthenticated && !student) {
-      router.push('/login/student');
-      return;
-    }
-    setIsValidating(false);
-  }, [isHydrated, isAuthenticated, student]);
+  if (!isHydrated) {
+    return <Loading message="Verifying session..." />;
+  }
 
-  if (!isHydrated || isValidating) return <Loading message="Verifying session..." />;
+  if (!isAuthenticated && !student) {
+    redirect('/login/student');
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

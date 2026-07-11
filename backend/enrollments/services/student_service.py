@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from uuid import UUID
+from typing import Any
 
 import structlog
 from django.contrib.auth import get_user_model
@@ -84,9 +85,10 @@ class StudentService(BaseService):
         if not student:
             return None
         # Update user email if changed
-        if "email" in kwargs and student.user:
-            student.user.email = kwargs.pop("email")
-            student.user.save(update_fields=["email"])
+        user_profile: Any = student.user
+        if "email" in kwargs and user_profile:
+            user_profile.email = kwargs.pop("email")
+            user_profile.save(update_fields=["email"])
         updated_student = self.repo.update(student_id, **kwargs)
         if updated_student:
             AuditLog.log(
