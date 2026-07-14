@@ -82,6 +82,29 @@ class MarksEntry(BaseModel):
             )
         ]
 
+    # -- Serializer-friendly aliases --------------------------------------------------
+    # The entire API layer references `obtained_marks` and `is_grade_only`; these
+    # properties bridge the gap between the serializers and the actual DB columns.
+
+    @property
+    def obtained_marks(self):
+        return self.marks_value
+
+    @obtained_marks.setter
+    def obtained_marks(self, value):
+        self.marks_value = value
+
+    @property
+    def is_grade_only(self):
+        return self.grade_value is not None
+
+    @is_grade_only.setter
+    def is_grade_only(self, value):
+        if value:
+            self.marks_value = None
+        else:
+            self.grade_value = None
+
     def __str__(self) -> str:
         value = self.marks_value or self.grade_value or self.descriptive_value or "ABSENT"
         return (

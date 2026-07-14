@@ -4,7 +4,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from core.permissions import IsAdmin
+from core.permissions import IsAdmin, IsAdminOrTeacherReadOnly
 from enrollments.models import Student, Enrollment, ClassTeacher, SystemSetting
 from enrollments.api.serializers import (
     StudentSerializer,
@@ -21,7 +21,7 @@ from enrollments.services.classteacher_service import ClassTeacherService
 class StudentViewSet(viewsets.ModelViewSet):
     queryset = Student.objects.all()
     serializer_class = StudentSerializer
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAdminOrTeacherReadOnly]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -93,6 +93,9 @@ class StudentViewSet(viewsets.ModelViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
         student.is_active = False
         student.save(update_fields=["is_active"])
+        if student.user:
+            student.user.is_active = False
+            student.user.save(update_fields=["is_active"])
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=False, methods=["get"], url_path="generate-id")
@@ -122,7 +125,7 @@ class StudentViewSet(viewsets.ModelViewSet):
 class EnrollmentViewSet(viewsets.ModelViewSet):
     queryset = Enrollment.objects.all()
     serializer_class = EnrollmentSerializer
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAdminOrTeacherReadOnly]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -143,6 +146,18 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()
+        session = request.query_params.get("session")
+        class_field = request.query_params.get("class_field")
+        section = request.query_params.get("section")
+        status_filter = request.query_params.get("status")
+        if session:
+            queryset = queryset.filter(session_id=session)
+        if class_field:
+            queryset = queryset.filter(class_field_id=class_field)
+        if section:
+            queryset = queryset.filter(section_id=section)
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
         page = self.paginate_queryset(queryset)
         if page is not None:
             return self.get_paginated_response(EnrollmentSerializer(page, many=True).data)
@@ -223,7 +238,7 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
 class ClassTeacherViewSet(viewsets.ModelViewSet):
     queryset = ClassTeacher.objects.all()
     serializer_class = ClassTeacherSerializer
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAdminOrTeacherReadOnly]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

@@ -17,6 +17,10 @@ class MarksEntrySerializer(serializers.ModelSerializer):
     exam_component_name = serializers.CharField(
         source="exam_component.name", read_only=True, default=None
     )
+    obtained_marks = serializers.DecimalField(
+        max_digits=6, decimal_places=2, read_only=True
+    )
+    is_grade_only = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = MarksEntry

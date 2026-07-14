@@ -1,7 +1,14 @@
 'use client';
 
-import { MarksheetPreview } from '@/components/teacher/marksheet-preview';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-export default function TeacherMarksheetPage() {
-  return <MarksheetPreview />;
+export default function TeacherMarksheetRedirect() {
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace('/teacher/marks');
+  }, [router]);
+
+  return null;
 }

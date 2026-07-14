@@ -48,7 +48,7 @@ class Student(BaseModel):
     email = models.EmailField(blank=True, default="")
     profile_pic = models.ImageField(upload_to="students/profile_pics/", blank=True, null=True)
     address = models.TextField(blank=True, default="")
-    admission_date = models.DateField(default=timezone.now)
+    admission_date = models.DateField(default=timezone.localdate)
     admission_class = models.ForeignKey(
         "academics.Class",
         on_delete=models.SET_NULL,
@@ -172,6 +172,13 @@ class Enrollment(BaseModel):
         db_table = "enrollments"
         ordering = ["-created_at"]
         unique_together = [("student", "session")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["class_field", "section", "session", "roll_no"],
+                name="unique_roll_no_per_class_section_session",
+                condition=models.Q(roll_no__gt=""),
+            ),
+        ]
 
     def __str__(self) -> str:
         obj: typing.Any = self

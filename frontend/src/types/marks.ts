@@ -1,25 +1,31 @@
 export interface MarksEntry {
   id: string;
-  student_id: string;
-  subject_id: string;
-  exam_type_id: string;
-  session_id: string;
-  marks_obtained: number;
-  full_marks: number;
+  enrollment: string;
+  subject: string;
+  subject_name?: string;
+  exam_component: string;
+  exam_component_name?: string;
+  obtained_marks: number | null;
   is_absent: boolean;
-  remarks: string | null;
+  is_grade_only: boolean;
+  remarks: string;
+  entered_by: string | null;
+  entered_by_email?: string;
   created_at: string;
-  student?: { id: string; name: string; roll_no: string };
-  subject?: { id: string; name: string };
+  updated_at: string;
 }
 
 export interface SubjectResult {
   id: string;
-  student_id: string;
-  subject_id: string;
-  session_id: string;
-  marks_obtained: number;
-  full_marks: number;
+  enrollment: string;
+  subject: string;
+  subject_name: string;
+  subject_code: string;
+  total_obtained: number;
+  total_full: number;
+  percentage: number;
   grade: string;
+  grade_point: number;
   created_at: string;
+  updated_at: string;
 }

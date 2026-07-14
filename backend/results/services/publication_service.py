@@ -115,7 +115,7 @@ class ResultPublicationService(BaseService):
             session=publication.session,
             class_field=publication.class_field,
             section=publication.section,
-            is_active=True,
+            status="active",
         ).select_related("student")
 
         for enrollment in enrollments:

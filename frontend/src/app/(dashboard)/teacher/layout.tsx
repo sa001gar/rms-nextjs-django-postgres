@@ -6,14 +6,11 @@ import { useAuthStore, useIsHydrated } from '@/stores/auth-store';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
 import { SplashScreen } from '@/components/ui/splash-screen';
-import { LayoutDashboard, BookOpen, FileText, ClipboardList, Users } from 'lucide-react';
+import { LayoutDashboard, BookOpen } from 'lucide-react';
 
 const navItems = [
   { title: 'Dashboard', href: '/teacher', icon: LayoutDashboard },
   { title: 'Marks Entry', href: '/teacher/marks', icon: BookOpen },
-  { title: 'Marksheet', href: '/teacher/marksheet', icon: FileText },
-  { title: 'Reports', href: '/teacher/reports', icon: ClipboardList },
-  { title: 'Students', href: '/teacher/students', icon: Users },
 ];
 
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {

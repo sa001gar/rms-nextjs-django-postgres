@@ -294,7 +294,7 @@ class ReportCardComputationService:
         if template_id:
             return ReportCardTemplate.objects.filter(id=template_id).first()
         return ReportCardTemplate.objects.filter(
-            class_ref_id=class_id, is_default=True
+            assignments__class_ref_id=class_id, is_default=True
         ).first()
 
     def _load_mappings(
@@ -477,7 +477,7 @@ class ReportCardComputationService:
     def _build_grading_scale(self, grade_scale: list[GradeRule]) -> list[GradingScaleEntry]:
         return [
             GradingScaleEntry(
-                grade=g.grade_label,
+                grade=g.label,
                 min_percentage=g.min_percentage,
                 max_percentage=g.max_percentage,
                 grade_point=g.grade_point,
@@ -494,5 +494,5 @@ class ReportCardComputationService:
             return "", Decimal("0")
         for g in grade_scale:
             if g.min_percentage <= percentage <= g.max_percentage:
-                return g.grade_label, g.grade_point
+                return g.label, g.grade_point
         return "", Decimal("0")

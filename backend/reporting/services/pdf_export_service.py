@@ -16,10 +16,47 @@ class PDFExportService(BaseService):
 
     def generate_student_report_card_pdf(self, enrollment_id: UUID) -> io.BytesIO:
         """Generate a PDF report card for a single student."""
-        from reporting.services.report_card_service import ReportCardService
+        from reporting.services.computation_service import ReportCardComputationService
+        from shared.types import ReportCardDTO, SubjectResultDTO
 
-        report_svc = ReportCardService()
-        report = report_svc.generate_student_report_card(enrollment_id)
+        from enrollments.models import Enrollment
+        enrollment = Enrollment.objects.select_related(
+            "student", "session", "class_field", "section"
+        ).get(id=enrollment_id)
+
+        comp_svc = ReportCardComputationService()
+        computed = comp_svc.generate(enrollment_id=enrollment_id)
+
+        subject_results = [
+            SubjectResultDTO(
+                id=UUID(int=0),
+                enrollment_id=enrollment_id,
+                subject_id=s.subject_id,
+                total_obtained=int(s.total_obtained),
+                total_full=int(s.total_full),
+                percentage=s.overall_percentage or Decimal("0"),
+                grade=s.overall_grade,
+                grade_point=s.overall_grade_point,
+            )
+            for s in computed.subjects
+        ]
+        total_marks = sum(int(s.total_obtained) for s in computed.subjects)
+        total_full = sum(int(s.total_full) for s in computed.subjects)
+        pct = computed.summary.overall_percentage or Decimal("0")
+
+        report = ReportCardDTO(
+            student_name=enrollment.student.name,
+            student_id=enrollment.student.student_id,
+            roll_no=enrollment.roll_no,
+            class_name=enrollment.class_field.name,
+            section_name=enrollment.section.name,
+            session_name=enrollment.session.name,
+            results=subject_results,
+            total_marks=total_marks,
+            total_full=total_full,
+            percentage=pct,
+            overall_grade=computed.summary.overall_grade,
+        )
 
         buffer = io.BytesIO()
         try:

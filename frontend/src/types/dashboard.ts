@@ -31,9 +31,14 @@ export interface AdminDashboardData {
 export interface TeacherDashboardData {
   assigned_subjects: Array<{
     id: string;
+    class_id: string | null;
     class_name: string;
+    section_id: string | null;
     section_name: string;
+    subject_id: string | null;
     subject_name: string;
+    session_id: string | null;
+    session_name: string;
   }>;
   total_assigned_subjects: number;
   class_teacher_of: Array<{
@@ -42,6 +47,10 @@ export interface TeacherDashboardData {
     section_name: string;
   }>;
   marks_entered: number;
+  teachers_sessions: Array<{ id: string; name: string }>;
+  teachers_classes: Array<{ id: string; name: string }>;
+  teachers_sections: Array<{ id: string; name: string }>;
+  teachers_subjects: Array<{ id: string; name: string }>;
 }
 
 export interface StudentDashboardData {

@@ -1,5 +1,7 @@
 import api from './client';
 
+// ─── Types ─────────────────────────────────────────────────────────────────
+
 export interface SubjectConfig {
   id: string;
   name: string;
@@ -76,14 +78,65 @@ export interface ResultConfig {
   configs: ComponentConfig[];
   grade_scale: GradeScale | null;
   promotion_rule: PromotionRule | null;
+  is_locked: boolean;
 }
+
+export interface ResultConfigPayload {
+  academic_structure?: TermData[];
+  subjects?: Partial<SubjectConfig>[];
+  configs?: Partial<ComponentConfig>[];
+  grade_scale?: Partial<GradeScale> | null;
+  promotion_rule?: Partial<PromotionRule> | null;
+}
+
+// ─── API Client ────────────────────────────────────────────────────────────
 
 export const resultConfigApi = {
   get: (sessionId: string, classId: string): Promise<ResultConfig> =>
     api.get(`/academics/result-config/${sessionId}/${classId}/`),
 
-  save: (sessionId: string, classId: string, data: Partial<ResultConfig>): Promise<ResultConfig> =>
+  save: (sessionId: string, classId: string, data: ResultConfigPayload): Promise<ResultConfig> =>
     api.put(`/academics/result-config/${sessionId}/${classId}/`, data),
+
+  clone: (
+    sessionId: string,
+    classId: string,
+    targetSessionId: string,
+    targetClassId: string
+  ): Promise<ResultConfig> =>
+    api.post(`/academics/result-config/${sessionId}/${classId}/clone/`, {
+      target_session_id: targetSessionId,
+      target_class_id: targetClassId,
+    }),
+
+  duplicateTerm: (
+    sessionId: string,
+    classId: string,
+    termId: string,
+    name?: string
+  ): Promise<ResultConfig> =>
+    api.post(`/academics/result-config/${sessionId}/${classId}/duplicate-term/`, {
+      term_id: termId,
+      name,
+    }),
+
+  lock: (sessionId: string, classId: string): Promise<{ is_locked: boolean }> =>
+    api.post(`/academics/result-config/${sessionId}/${classId}/lock/`),
+
+  unlock: (sessionId: string, classId: string): Promise<{ is_locked: boolean }> =>
+    api.post(`/academics/result-config/${sessionId}/${classId}/unlock/`),
+
+  reset: (sessionId: string, classId: string): Promise<ResultConfig> =>
+    api.post(`/academics/result-config/${sessionId}/${classId}/reset/`),
+
+  importFromSession: (
+    sessionId: string,
+    classId: string,
+    sourceSessionId: string
+  ): Promise<ResultConfig> =>
+    api.post(`/academics/result-config/${sessionId}/${classId}/import/`, {
+      source_session_id: sourceSessionId,
+    }),
 };
 
 export const subjectGroupsApi = {

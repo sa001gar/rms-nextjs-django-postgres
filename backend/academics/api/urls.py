@@ -21,7 +21,16 @@ from academics.api.views import (
     ReportCardSectionSubjectGroupViewSet,
     ReportCardTemplateAssignmentViewSet,
 )
-from academics.api.config_views import ResultConfigView, SubjectGroupListView
+from academics.api.config_views import (
+    ResultConfigView,
+    SubjectGroupListView,
+    CloneConfigView,
+    DuplicateTermView,
+    LockConfigView,
+    UnlockConfigView,
+    ResetConfigView,
+    ImportConfigView,
+)
 
 router = DefaultRouter()
 router.register(r"sessions", AcademicSessionViewSet, basename="sessions")
@@ -43,7 +52,13 @@ router.register(r"report-card-template-assignments", ReportCardTemplateAssignmen
 
 urlpatterns = [
     path("", include(router.urls)),
-    # ── New aggregate endpoints ──
+    # ── Aggregate config endpoints ──
     path("result-config/<uuid:session_id>/<uuid:class_id>/", ResultConfigView.as_view(), name="result-config"),
+    path("result-config/<uuid:session_id>/<uuid:class_id>/clone/", CloneConfigView.as_view(), name="result-config-clone"),
+    path("result-config/<uuid:session_id>/<uuid:class_id>/duplicate-term/", DuplicateTermView.as_view(), name="result-config-duplicate-term"),
+    path("result-config/<uuid:session_id>/<uuid:class_id>/lock/", LockConfigView.as_view(), name="result-config-lock"),
+    path("result-config/<uuid:session_id>/<uuid:class_id>/unlock/", UnlockConfigView.as_view(), name="result-config-unlock"),
+    path("result-config/<uuid:session_id>/<uuid:class_id>/reset/", ResetConfigView.as_view(), name="result-config-reset"),
+    path("result-config/<uuid:session_id>/<uuid:class_id>/import/", ImportConfigView.as_view(), name="result-config-import"),
     path("subject-groups/", SubjectGroupListView.as_view(), name="subject-groups"),
 ]

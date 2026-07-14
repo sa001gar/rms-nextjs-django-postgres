@@ -57,7 +57,7 @@ class ResultPublicationSubmitView(APIView):
 
     def post(self, request, pk):
         service = ResultPublicationService()
-        publication = service.submit_for_review(UUID(pk))
+        publication = service.submit_for_review(pk)
         if not publication:
             return Response(
                 {"error": "Publication not found or cannot be submitted"},
@@ -71,7 +71,7 @@ class ResultPublicationPublishView(APIView):
 
     def post(self, request, pk):
         service = ResultPublicationService()
-        publication = service.publish(UUID(pk), request.user)
+        publication = service.publish(pk, request.user)
         if not publication:
             return Response(
                 {"error": "Publication not found or cannot be published"},
@@ -85,7 +85,7 @@ class ResultPublicationUnpublishView(APIView):
 
     def post(self, request, pk):
         service = ResultPublicationService()
-        publication = service.unpublish(UUID(pk))
+        publication = service.unpublish(pk)
         if not publication:
             return Response(
                 {"error": "Publication not found or cannot be unpublished"},

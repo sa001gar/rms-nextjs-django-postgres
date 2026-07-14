@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/table';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Loading } from '@/components/ui/loading';
-import api from '@/lib/api/client';
+import api, { getAccessToken } from '@/lib/api/client';
 import { toast } from 'sonner';
 import { Loader2, FileText, Eye, Download, TrendingUp } from 'lucide-react';
 
@@ -316,10 +316,24 @@ export default function ResultsPage() {
                             <Button
                               variant="ghost"
                               size="icon-sm"
-                              onClick={() => {
+                              onClick={async () => {
                                 const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-                                const enrollment = result.student_id;
-                                window.open(`${base}/reporting/report-cards/student/${enrollment}/pdf/`, '_blank');
+                                const token = getAccessToken();
+                                const url = `${base}/reporting/report-cards/student/${result.student_id}/pdf/`;
+                                try {
+                                  const res = await fetch(url, {
+                                    headers: token ? { Authorization: `Bearer ${token}` } : {},
+                                  });
+                                  if (!res.ok) throw new Error('Failed to download');
+                                  const blob = await res.blob();
+                                  const a = document.createElement('a');
+                                  a.href = URL.createObjectURL(blob);
+                                  a.download = `report-card-${result.student_name || result.student_id}.pdf`;
+                                  a.click();
+                                  URL.revokeObjectURL(a.href);
+                                } catch {
+                                  toast.error('Failed to download report card');
+                                }
                               }}
                               title="View Report Card"
                             >

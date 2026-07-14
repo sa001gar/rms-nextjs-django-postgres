@@ -4,7 +4,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from core.permissions import IsAdmin
+from core.permissions import IsAdmin, IsAdminOrTeacherReadOnly
 from academics.services.session_service import SessionService
 from academics.services.class_service import ClassService
 from academics.services.subject_service import SubjectService
@@ -51,7 +51,7 @@ from academics.api.serializers import (
 
 
 class AcademicSessionViewSet(viewsets.ViewSet):
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAdminOrTeacherReadOnly]
     service = SessionService()
 
     def list(self, request):
@@ -86,7 +86,7 @@ class AcademicSessionViewSet(viewsets.ViewSet):
 
 
 class TermViewSet(viewsets.ViewSet):
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAdminOrTeacherReadOnly]
 
     def list(self, request):
         from academics.models import Term
@@ -120,7 +120,7 @@ class TermViewSet(viewsets.ViewSet):
 
 
 class SubjectCategoryViewSet(viewsets.ViewSet):
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAdminOrTeacherReadOnly]
 
     def list(self, request):
         from academics.models import SubjectCategory
@@ -150,7 +150,7 @@ class SubjectCategoryViewSet(viewsets.ViewSet):
 
 
 class ExamViewSet(viewsets.ViewSet):
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAdminOrTeacherReadOnly]
 
     def list(self, request):
         from academics.models import Exam
@@ -199,7 +199,7 @@ class ExamViewSet(viewsets.ViewSet):
 
 
 class ClassViewSet(viewsets.ViewSet):
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAdminOrTeacherReadOnly]
     service = ClassService()
 
     def list(self, request):
@@ -249,7 +249,7 @@ class ClassViewSet(viewsets.ViewSet):
 
 
 class SubjectViewSet(viewsets.ViewSet):
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAdminOrTeacherReadOnly]
     service = SubjectService()
 
     def list(self, request):
@@ -331,7 +331,7 @@ class SubjectViewSet(viewsets.ViewSet):
 
 
 class ExamComponentViewSet(viewsets.ViewSet):
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAdminOrTeacherReadOnly]
 
     def list(self, request):
         from academics.models import ExamComponent
@@ -364,7 +364,7 @@ class ExamComponentViewSet(viewsets.ViewSet):
 
 
 class AssessmentComponentConfigViewSet(viewsets.ViewSet):
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAdminOrTeacherReadOnly]
 
     def list(self, request):
         from academics.models import AssessmentComponentConfig
@@ -422,7 +422,7 @@ class AssessmentComponentConfigViewSet(viewsets.ViewSet):
 
 
 class GradeScaleViewSet(viewsets.ViewSet):
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAdminOrTeacherReadOnly]
 
     def list(self, request):
         from academics.models import GradeScale, GradeRule
@@ -458,7 +458,7 @@ class GradeScaleViewSet(viewsets.ViewSet):
 
 
 class GradeRuleViewSet(viewsets.ViewSet):
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAdminOrTeacherReadOnly]
 
     def list(self, request):
         from academics.models import GradeRule
@@ -491,7 +491,7 @@ class GradeRuleViewSet(viewsets.ViewSet):
 
 
 class PromotionRuleViewSet(viewsets.ViewSet):
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAdminOrTeacherReadOnly]
 
     def list(self, request):
         from academics.models import PromotionRule
@@ -529,7 +529,7 @@ class PromotionRuleViewSet(viewsets.ViewSet):
 
 
 class ReportCardTemplateViewSet(viewsets.ViewSet):
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAdminOrTeacherReadOnly]
 
     def list(self, request):
         from academics.models import ReportCardTemplate
@@ -615,7 +615,7 @@ class ReportCardTemplateViewSet(viewsets.ViewSet):
 
 
 class ReportCardSectionViewSet(viewsets.ViewSet):
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAdminOrTeacherReadOnly]
 
     def update(self, request, pk=None):
         from academics.models import ReportCardSection
@@ -643,7 +643,7 @@ class ReportCardSectionViewSet(viewsets.ViewSet):
 
 
 class ReportCardSectionSubjectGroupViewSet(viewsets.ViewSet):
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAdminOrTeacherReadOnly]
 
     def destroy(self, request, pk=None):
         from academics.models import ReportCardSectionSubjectGroup
@@ -652,7 +652,7 @@ class ReportCardSectionSubjectGroupViewSet(viewsets.ViewSet):
 
 
 class ReportCardTemplateAssignmentViewSet(viewsets.ViewSet):
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAdminOrTeacherReadOnly]
 
     def create(self, request):
         from academics.models import ReportCardTemplateAssignment
@@ -668,7 +668,7 @@ class ReportCardTemplateAssignmentViewSet(viewsets.ViewSet):
 
 
 class TeacherAssignmentViewSet(viewsets.ViewSet):
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAdminOrTeacherReadOnly]
     service = AssignmentService()
 
     def list(self, request):

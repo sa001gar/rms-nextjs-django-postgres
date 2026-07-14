@@ -2,8 +2,10 @@
 
 from datetime import date
 from decimal import Decimal
+from io import BytesIO
 from uuid import UUID
 
+from django.http import HttpResponse
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -11,6 +13,7 @@ from rest_framework.response import Response
 from core.permissions import IsAdminOrTeacher
 from enrollments.models import Enrollment
 from reporting.services.computation_service import ReportCardComputationService
+from reporting.services.pdf_export_service import PDFExportService
 
 
 class ReportCardViewSet(viewsets.ViewSet):
@@ -32,6 +35,30 @@ class ReportCardViewSet(viewsets.ViewSet):
         )
 
         return Response(self._serialize(data))
+
+    @action(detail=False, methods=["get"], url_path="student/(?P<enrollment_id>[^/.]+)/pdf")
+    def student_report_card_pdf(self, request, enrollment_id=None):
+        try:
+            # Accept both UUID enrollment_id and student_id (string like STU_...)
+            try:
+                resolved = UUID(enrollment_id)
+            except ValueError:
+                from enrollments.models import Student
+                student = Student.objects.filter(student_id=enrollment_id).first()
+                if not student:
+                    return Response({"error": "Student not found"}, status=status.HTTP_404_NOT_FOUND)
+                enrollment = Enrollment.objects.filter(student=student, status="active").first()
+                if not enrollment:
+                    return Response({"error": "Active enrollment not found"}, status=status.HTTP_404_NOT_FOUND)
+                resolved = enrollment.id
+
+            svc = PDFExportService()
+            pdf_buffer = svc.generate_student_report_card_pdf(resolved)
+            response = HttpResponse(pdf_buffer.getvalue(), content_type="application/pdf")
+            response["Content-Disposition"] = f'attachment; filename="report_card_{resolved}.pdf"'
+            return response
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=False, methods=["get"], url_path="by-user/(?P<user_id>[^/.]+)")
     def by_user(self, request, user_id=None):
@@ -71,6 +98,46 @@ class ReportCardViewSet(viewsets.ViewSet):
         )
 
         return Response(self._serialize(data))
+
+    @action(detail=False, methods=["get"], url_path="by-user/(?P<user_id>[^/.]+)/pdf")
+    def by_user_pdf(self, request, user_id=None):
+        """Generate PDF report card resolved by user ID."""
+        session_id = request.query_params.get("session_id")
+
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        user = User.objects.filter(id=user_id, role="student").first()
+        if not user:
+            return Response(
+                {"detail": "Student user not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        enrollment_qs = Enrollment.objects.filter(
+            student__user=user,
+            status="active",
+        )
+        if session_id:
+            enrollment_qs = enrollment_qs.filter(session_id=session_id)
+
+        enrollment = enrollment_qs.select_related(
+            "student", "session", "class_field", "section"
+        ).first()
+
+        if not enrollment:
+            return Response(
+                {"detail": "No active enrollment found for this student."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        try:
+            svc = PDFExportService()
+            pdf_buffer = svc.generate_student_report_card_pdf(enrollment.id)
+            response = HttpResponse(pdf_buffer.getvalue(), content_type="application/pdf")
+            response["Content-Disposition"] = f'attachment; filename="report_card_{enrollment.id}.pdf"'
+            return response
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=False, methods=["get"], url_path="class")
     def class_report_cards(self, request):

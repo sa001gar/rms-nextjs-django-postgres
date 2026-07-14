@@ -1,15 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { marksApi } from '@/lib/api/marks';
-import type { MarksEntry } from '@/types';
+import type { MarksEntry } from '@/types/marks';
 import { queryKeys } from './use-sessions';
 
-export function useMarks(filters?: {
-  student_id?: string;
-  subject_id?: string;
-  session_id?: string;
-  class_id?: string;
-  section_id?: string;
-}) {
+type MarksFilters = Record<string, unknown>;
+
+export function useMarks(filters?: MarksFilters) {
   return useQuery({
     queryKey: ['marks', filters],
     queryFn: () => marksApi.getAll(filters),
@@ -20,7 +16,7 @@ export function useMarks(filters?: {
 export function useCreateMark() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: Partial<MarksEntry>) => marksApi.create(data),
+    mutationFn: (data: Parameters<typeof marksApi.create>[0]) => marksApi.create(data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['marks'] }),
   });
 }
@@ -28,7 +24,8 @@ export function useCreateMark() {
 export function useUpdateMark() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<MarksEntry> }) => marksApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: Parameters<typeof marksApi.update>[1] }) =>
+      marksApi.update(id, data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['marks'] }),
   });
 }
@@ -36,7 +33,8 @@ export function useUpdateMark() {
 export function useBulkUpsertMarks() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (marks: Partial<MarksEntry>[]) => marksApi.bulkUpsert(marks),
+    mutationFn: (entries: Parameters<typeof marksApi.bulkUpsert>[0]) =>
+      marksApi.bulkUpsert(entries),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['marks'] });
       queryClient.invalidateQueries({ queryKey: ['results'] });

@@ -95,19 +95,52 @@ class TeacherDashboardView(APIView):
             is_active=True,
         ) if active_session else TeacherAssignment.objects.none()
 
-        assigned_subjects = [
+        # Dedicated lists for select filters
+        teachers_sessions_map = {}
+        teachers_classes = {}
+        teachers_sections = {}
+        teachers_subjects = {}
+
+        for a in assignments:
+            if a.session_id:
+                teachers_sessions_map[str(a.session_id)] = a.session.name if a.session else ""
+            if a.class_ref_id:
+                teachers_classes[str(a.class_ref_id)] = a.class_ref.name if a.class_ref else ""
+            if a.section_id:
+                teachers_sections[str(a.section_id)] = a.section.name if a.section else ""
+            if a.subject_id:
+                teachers_subjects[str(a.subject_id)] = a.subject.name if a.subject else ""
+
+        stats["teachers_sessions"] = [
+            {"id": k, "name": v} for k, v in teachers_sessions_map.items()
+        ]
+        stats["teachers_classes"] = [
+            {"id": k, "name": v} for k, v in teachers_classes.items()
+        ]
+        stats["teachers_sections"] = [
+            {"id": k, "name": v} for k, v in teachers_sections.items()
+        ]
+        stats["teachers_subjects"] = [
+            {"id": k, "name": v} for k, v in teachers_subjects.items()
+        ]
+
+        # Also add ids to the assigned_subjects list
+        assigned_subjects_with_ids = [
             {
                 "id": str(a.id),
+                "class_id": str(a.class_ref_id) if a.class_ref_id else None,
                 "class_name": a.class_ref.name if a.class_ref else "",
+                "section_id": str(a.section_id) if a.section_id else None,
                 "section_name": a.section.name if a.section else "",
+                "subject_id": str(a.subject_id) if a.subject_id else None,
                 "subject_name": a.subject.name if a.subject else "",
+                "session_id": str(a.session_id) if a.session_id else None,
+                "session_name": a.session.name if a.session else "",
             }
             for a in assignments
         ]
-
-        stats["assigned_subjects"] = assigned_subjects
-
-        stats["total_assigned_subjects"] = len(assigned_subjects)
+        stats["assigned_subjects"] = assigned_subjects_with_ids
+        stats["total_assigned_subjects"] = len(assigned_subjects_with_ids)
 
         # Classes where teacher is class teacher
         class_teacher_of = ClassTeacher.objects.filter(

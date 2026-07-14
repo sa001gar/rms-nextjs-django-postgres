@@ -58,9 +58,13 @@ class MarksEntryRepository(BaseRepository[MarksEntry]):
                 exam_component_id=entry["exam_component_id"],
             )
             if existing:
-                existing.obtained_marks = entry["obtained_marks"]
+                existing.marks_value = entry["obtained_marks"]
                 existing.is_absent = entry.get("is_absent", False)
-                existing.is_grade_only = entry.get("is_grade_only", False)
+                if entry.get("is_grade_only", False):
+                    existing.grade_value = str(entry["obtained_marks"])
+                    existing.marks_value = None
+                else:
+                    existing.grade_value = None
                 if entry.get("remarks"):
                     existing.remarks = entry["remarks"]
                 if entry.get("entered_by_id"):
@@ -68,15 +72,18 @@ class MarksEntryRepository(BaseRepository[MarksEntry]):
                 existing.save()
                 results.append(existing)
             else:
-                obj = self.model.objects.create(
-                    enrollment_id=entry["enrollment_id"],
-                    subject_id=entry["subject_id"],
-                    exam_component_id=entry["exam_component_id"],
-                    obtained_marks=entry["obtained_marks"],
-                    is_absent=entry.get("is_absent", False),
-                    is_grade_only=entry.get("is_grade_only", False),
-                    remarks=entry.get("remarks", ""),
-                    entered_by_id=entry.get("entered_by_id"),
-                )
+                kwargs = {
+                    "enrollment_id": entry["enrollment_id"],
+                    "subject_id": entry["subject_id"],
+                    "exam_component_id": entry["exam_component_id"],
+                    "marks_value": entry["obtained_marks"],
+                    "is_absent": entry.get("is_absent", False),
+                    "remarks": entry.get("remarks", ""),
+                    "entered_by_id": entry.get("entered_by_id"),
+                }
+                if entry.get("is_grade_only", False):
+                    kwargs["grade_value"] = str(entry["obtained_marks"])
+                    kwargs["marks_value"] = None
+                obj = self.model.objects.create(**kwargs)
                 results.append(obj)
         return results
