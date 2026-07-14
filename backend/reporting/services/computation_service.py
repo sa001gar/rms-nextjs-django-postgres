@@ -12,9 +12,9 @@ from django.db.models import Prefetch
 from academics.models import (
     Exam,
     ExamComponent,
-    SubjectAssessmentScheme,
-    GradePolicyGrade,
-    GradePolicySet,
+    AssessmentComponentConfig,
+    GradeRule,
+    GradeScale,
     PromotionRule,
     ReportCardTemplate,
     SubjectCategory,
@@ -74,7 +74,7 @@ class ReportCardComputationService:
         mappings = self._load_mappings(class_id, marks_qs)
 
         # 4. Load grade policy
-        grade_policy = self._resolve_grade_policy(session_id)
+        grade_scale = self._resolve_grade_scale(session_id)
 
         # 5. Load promotion rule for this class
         promotion_rule = PromotionRule.objects.filter(
@@ -108,7 +108,7 @@ class ReportCardComputationService:
                 subject=subject,
                 marks_entries=subject_marks,
                 mappings=mappings.get(subject_id, {}),
-                grade_policy=grade_policy,
+                grade_scale=grade_scale,
             )
 
             if cat and not cat.is_scholastic:
@@ -126,14 +126,14 @@ class ReportCardComputationService:
 
         # Compute overall summary for scholastic subjects
         summary = self._compute_overall_summary(
-            scholastic_subjects, grade_policy, promotion_rule, enrollment.session_id
+            scholastic_subjects, grade_scale, promotion_rule, enrollment.session_id
         )
 
         # Build attendance summary
         attendance_data = self._compute_attendance(enrollment_id)
 
         # Build grading scale
-        grading_scale = self._build_grading_scale(grade_policy)
+        grading_scale = self._build_grading_scale(grade_scale)
 
         # Build remarks
         remarks = [
@@ -229,7 +229,7 @@ class ReportCardComputationService:
         class_id: UUID,
     ) -> ReportCardData:
         mappings = self._load_mappings(class_id, marks_list)
-        grade_policy = self._resolve_grade_policy(session_id)
+        grade_scale = self._resolve_grade_scale(session_id)
         promotion_rule = PromotionRule.objects.filter(
             session_id=session_id, from_class_id=class_id
         ).first()
@@ -252,7 +252,7 @@ class ReportCardComputationService:
                 subject=subject,
                 marks_entries=subject_marks,
                 mappings=mappings.get(subject_id, {}),
-                grade_policy=grade_policy,
+                grade_scale=grade_scale,
             )
 
             if cat and not cat.is_scholastic:
@@ -267,7 +267,7 @@ class ReportCardComputationService:
         scholastic_subjects.sort(key=lambda s: s.subject_code)
 
         summary = self._compute_overall_summary(
-            scholastic_subjects, grade_policy, promotion_rule, session_id
+            scholastic_subjects, grade_scale, promotion_rule, session_id
         )
 
         return ReportCardData(
@@ -301,32 +301,32 @@ class ReportCardComputationService:
         self,
         class_id: UUID,
         marks_list: list[MarksEntry],
-    ) -> dict[UUID, dict[UUID, SubjectAssessmentScheme]]:
+    ) -> dict[UUID, dict[UUID, AssessmentComponentConfig]]:
         subject_ids = {m.subject_id for m in marks_list}
-        qs = SubjectAssessmentScheme.objects.filter(
+        qs = AssessmentComponentConfig.objects.filter(
             class_ref_id=class_id,
             subject_id__in=subject_ids,
-            is_active=True,
-        ).select_related("exam_component")
-        mappings: dict[UUID, dict[UUID, SubjectAssessmentScheme]] = defaultdict(dict)
+            is_applicable=True,
+        ).select_related("assessment_component")
+        mappings: dict[UUID, dict[UUID, AssessmentComponentConfig]] = defaultdict(dict)
         for m in qs:
-            mappings[m.subject_id][m.exam_component_id] = m
+            mappings[m.subject_id][m.assessment_component_id] = m
         return dict(mappings)
 
-    def _resolve_grade_policy(
+    def _resolve_grade_scale(
         self, session_id: UUID
-    ) -> list[GradePolicyGrade]:
-        policy_set = GradePolicySet.objects.filter(
+    ) -> list[GradeRule]:
+        scale = GradeScale.objects.filter(
             session_id=session_id, is_active=True
         ).first()
-        if not policy_set:
-            policy_set = GradePolicySet.objects.filter(
+        if not scale:
+            scale = GradeScale.objects.filter(
                 session_id__isnull=True, is_active=True
             ).first()
-        if not policy_set:
+        if not scale:
             return []
         return list(
-            GradePolicyGrade.objects.filter(grade_policy_set=policy_set)
+            GradeRule.objects.filter(grade_scale=scale)
             .order_by("-min_percentage")
         )
 
@@ -335,7 +335,7 @@ class ReportCardComputationService:
         subject,
         marks_entries: list[MarksEntry],
         mappings: dict,
-        grade_policy: list[GradePolicyGrade],
+        grade_scale: list[GradeRule],
     ) -> SubjectResultData:
         # Group marks by exam
         by_exam: dict[UUID, list[MarksEntry]] = defaultdict(list)
@@ -371,7 +371,7 @@ class ReportCardComputationService:
                 round((total_obtained / total_full) * Decimal("100"), 2)
                 if total_full > 0 else None
             )
-            grade_label, grade_point = self._lookup_grade(pct, grade_policy)
+            grade_label, grade_point = self._lookup_grade(pct, grade_scale)
 
             exam_groups.append(ExamGroupData(
                 exam_id=exam.id,
@@ -393,7 +393,7 @@ class ReportCardComputationService:
             round((overall_obtained / overall_full) * Decimal("100"), 2)
             if overall_full > 0 else None
         )
-        overall_grade, overall_gp = self._lookup_grade(overall_pct, grade_policy)
+        overall_grade, overall_gp = self._lookup_grade(overall_pct, grade_scale)
 
         return SubjectResultData(
             subject_id=subject.id,
@@ -413,7 +413,7 @@ class ReportCardComputationService:
     def _compute_overall_summary(
         self,
         subject_results: list[SubjectResultData],
-        grade_policy: list[GradePolicyGrade],
+        grade_scale: list[GradeRule],
         promotion_rule: PromotionRule | None,
         session_id: UUID,
     ) -> SummaryData:
@@ -424,7 +424,7 @@ class ReportCardComputationService:
             round((total_obtained / total_full) * Decimal("100"), 2)
             if total_full > 0 else None
         )
-        grade, gp = self._lookup_grade(pct, grade_policy)
+        grade, gp = self._lookup_grade(pct, grade_scale)
 
         promotion_status = ""
         if promotion_rule:
@@ -474,7 +474,7 @@ class ReportCardComputationService:
         except Exception:
             return []
 
-    def _build_grading_scale(self, grade_policy: list[GradePolicyGrade]) -> list[GradingScaleEntry]:
+    def _build_grading_scale(self, grade_scale: list[GradeRule]) -> list[GradingScaleEntry]:
         return [
             GradingScaleEntry(
                 grade=g.grade_label,
@@ -482,17 +482,17 @@ class ReportCardComputationService:
                 max_percentage=g.max_percentage,
                 grade_point=g.grade_point,
             )
-            for g in sorted(grade_policy, key=lambda x: x.display_order)
+            for g in sorted(grade_scale, key=lambda x: x.display_order)
         ]
 
     def _lookup_grade(
         self,
         percentage: Decimal | None,
-        grade_policy: list[GradePolicyGrade],
+        grade_scale: list[GradeRule],
     ) -> tuple[str, Decimal]:
         if percentage is None:
             return "", Decimal("0")
-        for g in grade_policy:
+        for g in grade_scale:
             if g.min_percentage <= percentage <= g.max_percentage:
                 return g.grade_label, g.grade_point
         return "", Decimal("0")

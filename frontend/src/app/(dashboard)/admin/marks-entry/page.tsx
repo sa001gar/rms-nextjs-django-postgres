@@ -1,277 +1,432 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useSessions } from '@/hooks/use-sessions';
 import { useClasses, useSections } from '@/hooks/use-classes';
-import { useSubjectAssignments } from '@/hooks/use-subjects';
-import { examComponentsApi, assessmentSchemesApi } from '@/lib/api/exams';
-import { marksEntriesApi } from '@/lib/api/marks-entries';
-import { enrollmentsApi } from '@/lib/api/enrollments';
-import { gradePolicySetsApi } from '@/lib/api/grading';
+import { useMarksGrid, useUpdateMarkCell } from '@/hooks/use-marks-grid';
+import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select } from '@/components/ui/select';
-import { MarksGrid, type MarksGridRow } from '@/components/dynamic/marks-grid';
+import { Button } from '@/components/ui/button';
 import { Loading } from '@/components/ui/loading';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
-import type { Enrollment } from '@/types';
-import type { MarksEntry, ExamComponent } from '@/types/exam';
+import { Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import type { GridEntry } from '@/lib/api/marks-grid';
 
 export default function MarksEntryPage() {
-  const queryClient = useQueryClient();
   const { data: sessions = [] } = useSessions();
   const { data: classes = [] } = useClasses();
 
   const [sessionId, setSessionId] = useState('');
   const [classId, setClassId] = useState('');
   const [sectionId, setSectionId] = useState('');
-  const [subjectId, setSubjectId] = useState('');
-  const [examComponentId, setExamComponentId] = useState('');
 
   const { data: sections = [] } = useSections(classId);
-  const { data: classSubjects = [] } = useSubjectAssignments(classId);
+  const { data: gridData, isLoading, refetch } = useMarksGrid(sessionId, classId, sectionId);
+  const updateCell = useUpdateMarkCell(sessionId, classId);
 
-  const { data: examComponents = [] } = useQuery({
-    queryKey: ['exam-components'],
-    queryFn: () => examComponentsApi.getAll(),
-  });
+  // Local entries state for optimistic updates
+  const [entries, setEntries] = useState<Record<string, GridEntry>>({});
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [focusCell, setFocusCell] = useState<{ row: number; col: number } | null>(null);
+  const cellRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  const allFiltersSelected = !!(
-    sessionId &&
-    classId &&
-    sectionId &&
-    subjectId &&
-    examComponentId
+  // Flatten grid data into lookup
+  useEffect(() => {
+    if (!gridData) return;
+    const map: Record<string, GridEntry> = {};
+    gridData.entries.forEach((e: any) => {
+      map[`${e.enrollment_id}:${e.subject_id}:${e.component_id}`] = e;
+    });
+    setEntries(map);
+  }, [gridData]);
+
+  // Build column groups: subject → components
+  const columnGroups = useMemo(() => {
+    if (!gridData) return [];
+    return gridData.subjects.map((subj: any) => {
+      const components = gridData.components.filter((comp: any) => {
+        const key = `${comp.id}:${subj.id}`;
+        const configVal = gridData.config_lookup[key];
+        return configVal !== undefined && configVal !== null;
+      });
+      return { subject: subj, components };
+    }).filter((g: any) => g.components.length > 0);
+  }, [gridData]);
+
+  const allFiltersSelected = !!(sessionId && classId);
+
+  const handleCellChange = useCallback(
+    (enrollmentId: string, subjectId: string, componentId: string, value: string) => {
+      const key = `${enrollmentId}:${subjectId}:${componentId}`;
+      const existing = entries[key];
+
+      const marksValue = value === '' ? null : Number(value);
+      const isAbsent = value.toUpperCase() === 'ABS';
+
+      const updatedEntry: GridEntry = {
+        enrollment_id: enrollmentId,
+        subject_id: subjectId,
+        component_id: componentId,
+        marks_value: isAbsent ? null : marksValue,
+        grade_value: existing?.grade_value || null,
+        descriptive_value: existing?.descriptive_value || null,
+        is_absent: isAbsent,
+        remarks: existing?.remarks || '',
+      };
+
+      setEntries((prev) => ({ ...prev, [key]: updatedEntry }));
+      setSaveStatus('saving');
+
+      // Debounced auto-save
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+      debounceTimer.current = setTimeout(() => {
+        updateCell.mutate(updatedEntry, {
+          onSuccess: () => setSaveStatus('saved'),
+          onError: () => setSaveStatus('error'),
+        });
+      }, 500);
+    },
+    [entries, updateCell]
   );
 
-  const { data: enrollmentsData, isLoading: enrollmentsLoading } = useQuery({
-    queryKey: ['enrollments', 'active', classId, sectionId, sessionId],
-    queryFn: () =>
-      enrollmentsApi.getAll({
-        class_id: classId,
-        section_id: sectionId,
-        session_id: sessionId,
-        status: 'active',
-      }),
-    enabled: allFiltersSelected,
-  });
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent, rowIdx: number, colIdx: number) => {
+      const totalRows = gridData?.students.length || 0;
+      const totalCols = columnGroups.reduce((acc, g) => acc + g.components.length, 0);
 
-  const { data: schemes = [], isLoading: schemesLoading } = useQuery({
-    queryKey: ['subject-assessment-schemes', classId, subjectId, sessionId],
-    queryFn: () =>
-      assessmentSchemesApi.getAll({
-        class_id: classId,
-        subject_id: subjectId,
-        session_id: sessionId,
-      }),
-    enabled: allFiltersSelected,
-  });
+      let nextRow = rowIdx;
+      let nextCol = colIdx;
 
-  const { data: existingMarks = [], isLoading: marksLoading } = useQuery({
-    queryKey: ['marks-entries', classId, subjectId, examComponentId],
-    queryFn: () =>
-      marksEntriesApi.getByClassSubject(classId, subjectId, examComponentId),
-    enabled: allFiltersSelected,
-  });
+      switch (e.key) {
+        case 'ArrowDown':
+          nextRow = Math.min(rowIdx + 1, totalRows - 1);
+          e.preventDefault();
+          break;
+        case 'ArrowUp':
+          nextRow = Math.max(rowIdx - 1, 0);
+          e.preventDefault();
+          break;
+        case 'Tab':
+          if (e.shiftKey) {
+            nextCol = Math.max(colIdx - 1, 0);
+          } else {
+            nextCol = Math.min(colIdx + 1, totalCols - 1);
+          }
+          e.preventDefault();
+          break;
+        case 'Enter':
+          nextRow = Math.min(rowIdx + 1, totalRows - 1);
+          e.preventDefault();
+          break;
+        default:
+          return;
+      }
 
-  const { data: gradePolicySets = [], isLoading: gradePoliciesLoading } =
-    useQuery({
-      queryKey: ['grade-policy-sets', sessionId],
-      queryFn: () => gradePolicySetsApi.getAll(sessionId),
-      enabled: allFiltersSelected,
-    });
+      setFocusCell({ row: nextRow, col: nextCol });
+      // Focus the next cell
+      const student = gridData?.students[nextRow];
+      if (!student) return;
+      let colCursor = 0;
+      for (const group of columnGroups) {
+        for (const comp of group.components) {
+          if (colCursor === nextCol) {
+            const cellKey = `${student.enrollment_id}:${group.subject.id}:${comp.id}`;
+            setTimeout(() => cellRefs.current[cellKey]?.focus(), 50);
+            return;
+          }
+          colCursor++;
+        }
+      }
+    },
+    [gridData, columnGroups]
+  );
 
-  const dataLoading =
-    enrollmentsLoading || schemesLoading || marksLoading || gradePoliciesLoading;
-
-  const selectedComponent = useMemo(() => {
-    return examComponents.find((c) => c.id === examComponentId) ?? null;
-  }, [examComponents, examComponentId]);
-
-  const activeGradePolicy = useMemo(() => {
+  if (!allFiltersSelected) {
     return (
-      gradePolicySets.find((gps) => gps.is_active) || gradePolicySets[0]
+      <div className="space-y-6">
+        <PageHeader title="Marks Entry" description="Enter marks using the spreadsheet grid" />
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex gap-4">
+              <div className="w-56">
+                <Select
+                  label="Session"
+                  placeholder="Select session"
+                  options={sessions.map((s: any) => ({ value: s.id, label: s.name }))}
+                  value={sessionId}
+                  onChange={(e) => { setSessionId(e.target.value); setClassId(''); setSectionId(''); }}
+                />
+              </div>
+              <div className="w-56">
+                <Select
+                  label="Class"
+                  placeholder="Select class"
+                  options={classes.map((c: any) => ({ value: c.id, label: c.name }))}
+                  value={classId}
+                  onChange={(e) => { setClassId(e.target.value); setSectionId(''); }}
+                  disabled={!sessionId}
+                />
+              </div>
+              <div className="w-56">
+                <Select
+                  label="Section (optional)"
+                  placeholder="All sections"
+                  options={sections.map((s: any) => ({ value: s.id, label: s.name }))}
+                  value={sectionId}
+                  onChange={(e) => setSectionId(e.target.value)}
+                  disabled={!classId}
+                />
+              </div>
+            </div>
+            <p className="mt-6 text-sm text-gray-400">Select session and class to load the marks grid.</p>
+          </CardContent>
+        </Card>
+      </div>
     );
-  }, [gradePolicySets]);
+  }
 
-  const gradeOptions = useMemo(() => {
-    if (!activeGradePolicy) return [];
-    return activeGradePolicy.grades.map((g) => ({
-      label: `${g.grade_label} (${g.min_percentage}-${g.max_percentage}%)`,
-      value: g.grade_label,
-    }));
-  }, [activeGradePolicy]);
+  if (isLoading) return <Loading message="Loading marks grid..." />;
+  if (!gridData) return <div className="text-gray-500">No data found.</div>;
 
-  const fullMarks = useMemo(() => {
-    const scheme = schemes.find(
-      (s) => s.exam_component_id === examComponentId,
-    );
-    if (scheme) return scheme.full_marks;
-    return selectedComponent?.full_marks ?? 0;
-  }, [schemes, examComponentId, selectedComponent]);
-
-  const students = useMemo((): MarksGridRow[] => {
-    const enrollments: Enrollment[] = Array.isArray(enrollmentsData)
-      ? enrollmentsData
-      : (enrollmentsData as { results?: Enrollment[] })?.results ?? [];
-    const marksByEnrollment: Record<string, MarksEntry> = {};
-    existingMarks.forEach((m) => {
-      marksByEnrollment[m.enrollment] = m;
-    });
-    return enrollments.map((enr) => {
-      const existing = marksByEnrollment[enr.id];
-      return {
-        enrollment_id: enr.id,
-        student_name: enr.student_name,
-        roll_no: enr.roll_no,
-        marks_value: existing?.marks_value ?? null,
-        grade_value: existing?.grade_value ?? null,
-        descriptive_value: existing?.descriptive_value ?? null,
-        is_absent: existing?.is_absent ?? false,
-        existing_id: existing?.id,
-      };
-    });
-  }, [enrollmentsData, existingMarks]);
-
-  const handleSave = async (rows: MarksGridRow[]) => {
-    const entries = rows.map((row) => ({
-      enrollment_id: row.enrollment_id,
-      subject_id: subjectId,
-      exam_component_id: examComponentId,
-      marks_value: row.marks_value,
-      grade_value: row.grade_value,
-      descriptive_value: row.descriptive_value,
-      is_absent: row.is_absent,
-      remarks: (row as any).remarks,
-    }));
-    try {
-      await marksEntriesApi.bulkUpsert(entries);
-      toast.success('Marks saved successfully');
-      queryClient.invalidateQueries({
-        queryKey: ['marks-entries', classId, subjectId, examComponentId],
-      });
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Failed to save marks',
-      );
-    }
-  };
+  const totalCells = columnGroups.reduce((acc, g) => acc + g.components.length, 0) * gridData.students.length;
+  const filledCells = Object.keys(entries).filter(
+    (k) => entries[k].marks_value !== null || entries[k].grade_value || entries[k].is_absent
+  ).length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
         title="Marks Entry"
-        description="Enter marks for students by class, subject and exam component"
+        description="Spreadsheet-style marks entry with auto-save"
+        actions={
+          <div className="flex items-center gap-2">
+            {saveStatus === 'saving' && (
+              <span className="flex items-center text-sm text-amber-600"><Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> Saving...</span>
+            )}
+            {saveStatus === 'saved' && (
+              <span className="flex items-center text-sm text-green-600"><CheckCircle className="h-3.5 w-3.5 mr-1" /> All changes saved</span>
+            )}
+            {saveStatus === 'error' && (
+              <span className="flex items-center text-sm text-red-600"><AlertCircle className="h-3.5 w-3.5 mr-1" /> Save error</span>
+            )}
+          </div>
+        }
       />
 
+      {/* Filters */}
       <Card>
-        <CardContent className="p-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-            <Select
-              label="Session"
-              placeholder="Select session"
-              options={sessions.map((s) => ({ value: s.id, label: s.name }))}
-              value={sessionId}
-              onChange={(e) => {
-                setSessionId(e.target.value);
-                setClassId('');
-                setSectionId('');
-                setSubjectId('');
-                setExamComponentId('');
-              }}
-            />
-            <Select
-              label="Class"
-              placeholder="Select class"
-              options={classes.map((c) => ({ value: c.id, label: c.name }))}
-              value={classId}
-              onChange={(e) => {
-                setClassId(e.target.value);
-                setSectionId('');
-                setSubjectId('');
-                setExamComponentId('');
-              }}
-              disabled={!sessionId}
-            />
-            <Select
-              label="Section"
-              placeholder="Select section"
-              options={sections.map((s) => ({ value: s.id, label: s.name }))}
-              value={sectionId}
-              onChange={(e) => {
-                setSectionId(e.target.value);
-                setSubjectId('');
-                setExamComponentId('');
-              }}
-              disabled={!classId}
-            />
-            <Select
-              label="Subject"
-              placeholder="Select subject"
-              options={classSubjects.map((cs) => ({
-                value: cs.subject?.id || (cs as any).subject_id || cs.id,
-                label: cs.subject?.name || '',
-              }))}
-              value={subjectId}
-              onChange={(e) => {
-                setSubjectId(e.target.value);
-                setExamComponentId('');
-              }}
-              disabled={!sectionId}
-            />
-            <Select
-              label="Exam Component"
-              placeholder="Select component"
-              options={examComponents.map((c) => ({
-                value: c.id,
-                label: c.name,
-              }))}
-              value={examComponentId}
-              onChange={(e) => setExamComponentId(e.target.value)}
-              disabled={!subjectId}
-            />
+        <CardContent className="p-3">
+          <div className="flex gap-4 items-end">
+            <div className="w-48">
+              <Select
+                label="Session"
+                options={sessions.map((s: any) => ({ value: s.id, label: s.name }))}
+                value={sessionId}
+                onChange={(e) => { setSessionId(e.target.value); setClassId(''); setSectionId(''); }}
+              />
+            </div>
+            <div className="w-48">
+              <Select
+                label="Class"
+                options={classes.map((c: any) => ({ value: c.id, label: c.name }))}
+                value={classId}
+                onChange={(e) => { setClassId(e.target.value); setSectionId(''); }}
+                disabled={!sessionId}
+              />
+            </div>
+            <div className="w-48">
+              <Select
+                label="Section"
+                options={[
+                  { value: '', label: 'All Sections' },
+                  ...sections.map((s: any) => ({ value: s.id, label: s.name })),
+                ]}
+                value={sectionId}
+                onChange={(e) => setSectionId(e.target.value)}
+              />
+            </div>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>
+              Refresh
+            </Button>
           </div>
         </CardContent>
       </Card>
 
-      {allFiltersSelected ? (
-        dataLoading ? (
-          <Card>
-            <CardContent className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-            </CardContent>
-          </Card>
-        ) : students.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center text-gray-500">
-              No active enrollments found for the selected criteria
-            </CardContent>
-          </Card>
-        ) : selectedComponent ? (
-          <Card>
-            <CardContent className="p-4">
-              <MarksGrid
-                students={students}
-                examComponent={selectedComponent}
-                gradeOptions={
-                  selectedComponent.value_type === 'grade' ? gradeOptions : undefined
-                }
-                fullMarks={fullMarks}
-                onSave={handleSave}
-              />
-            </CardContent>
-          </Card>
-        ) : null
-      ) : (
-        <Card>
-          <CardContent className="py-12 text-center text-gray-500">
-            Select session, class, section, subject, and exam component to begin
-            entering marks
-          </CardContent>
-        </Card>
-      )}
+      {/* Spreadsheet Grid */}
+      <Card>
+        <CardContent className="p-0 overflow-x-auto">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr>
+                <th className="text-left py-2 px-3 text-gray-500 font-medium border border-gray-200 bg-gray-50 sticky left-0 z-20 min-w-[40px]">
+                  #
+                </th>
+                <th className="text-left py-2 px-3 text-gray-500 font-medium border border-gray-200 bg-gray-50 sticky left-[40px] z-20 min-w-[80px]">
+                  Roll No
+                </th>
+                <th className="text-left py-2 px-3 text-gray-500 font-medium border border-gray-200 bg-gray-50 sticky left-[120px] z-20 min-w-[140px]">
+                  Name
+                </th>
+                {columnGroups.map((group) => (
+                  <th
+                    key={group.subject.id}
+                    colSpan={group.components.length}
+                    className="text-center py-2 px-2 text-gray-500 font-medium border border-gray-200 bg-gray-50 min-w-[60px]"
+                  >
+                    <div className="text-xs text-gray-400">{group.subject.code}</div>
+                    <div className="font-semibold text-gray-700">{group.subject.name}</div>
+                  </th>
+                ))}
+              </tr>
+              <tr>
+                <th className="border border-gray-200 bg-gray-50 sticky left-0 z-10" colSpan={3}></th>
+                {columnGroups.map((group) =>
+                  group.components.map((comp: any) => {
+                    const key = `${comp.id}:${group.subject.id}`;
+                    const fm = gridData.config_lookup[key];
+                    return (
+                      <th
+                        key={comp.id + group.subject.id}
+                        className="text-center py-1 px-1 text-[10px] text-gray-400 font-normal border border-gray-200 bg-gray-50"
+                        title={`${comp.exam_name} — ${comp.value_type}`}
+                      >
+                        {comp.name}
+                        {fm ? <span className="text-gray-300 ml-0.5">({fm})</span> : null}
+                      </th>
+                    );
+                  })
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {gridData.students.map((student: any, rowIdx: number) => {
+                let colCursor = 0;
+                return (
+                  <tr key={student.enrollment_id} className="hover:bg-gray-50">
+                    <td className="py-1.5 px-3 text-gray-400 border border-gray-200 sticky left-0 z-10 bg-white">
+                      {rowIdx + 1}
+                    </td>
+                    <td className="py-1.5 px-3 font-medium border border-gray-200 sticky left-[40px] z-10 bg-white">
+                      {student.roll_no}
+                    </td>
+                    <td className="py-1.5 px-3 border border-gray-200 sticky left-[120px] z-10 bg-white truncate max-w-[140px]">
+                      {student.name}
+                    </td>
+                    {columnGroups.map((group) =>
+                      group.components.map((comp: any) => {
+                        const key = `${student.enrollment_id}:${group.subject.id}:${comp.id}`;
+                        const entry = entries[key];
+                        const cellKey = `${student.enrollment_id}:${group.subject.id}:${comp.id}`;
+                        const isFocused =
+                          focusCell?.row === rowIdx && focusCell?.col === colCursor;
+                        const currentCol = colCursor;
+                        colCursor++;
+
+                        return (
+                          <td
+                            key={cellKey}
+                            className={cn(
+                              "py-0.5 px-1 border border-gray-200 text-center",
+                              entry?.is_absent && "bg-red-50"
+                            )}
+                          >
+                            {comp.value_type === 'grade' ? (
+                              <select
+                                className="w-full text-center border-0 bg-transparent text-sm focus:outline-none cursor-pointer"
+                                value={entry?.grade_value || ''}
+                                onChange={(e) =>
+                                  handleCellChange(
+                                    student.enrollment_id,
+                                    group.subject.id,
+                                    comp.id,
+                                    e.target.value
+                                  )
+                                }
+                              >
+                                <option value="">-</option>
+                                <option value="A1">A1</option>
+                                <option value="A2">A2</option>
+                                <option value="B1">B1</option>
+                                <option value="B2">B2</option>
+                                <option value="C1">C1</option>
+                                <option value="C2">C2</option>
+                                <option value="D">D</option>
+                                <option value="E">E</option>
+                              </select>
+                            ) : comp.value_type === 'descriptive' ? (
+                              <input
+                                type="text"
+                                className="w-20 text-center border-0 bg-transparent text-sm focus:outline-none"
+                                value={entry?.descriptive_value || ''}
+                                onChange={(e) =>
+                                  handleCellChange(
+                                    student.enrollment_id,
+                                    group.subject.id,
+                                    comp.id,
+                                    e.target.value
+                                  )
+                                }
+                              />
+                            ) : (
+                              <input
+                                ref={(el) => { cellRefs.current[cellKey] = el; }}
+                                type="text"
+                                className={cn(
+                                  "w-14 text-center border rounded px-1 py-0.5 text-sm transition-colors",
+                                  isFocused
+                                    ? "border-amber-400 ring-1 ring-amber-400"
+                                    : "border-transparent hover:border-gray-300 focus:border-amber-400 focus:ring-1 focus:ring-amber-400",
+                                  entry?.is_absent && "text-red-500 font-medium"
+                                )}
+                                value={
+                                  entry?.is_absent
+                                    ? 'ABS'
+                                    : entry?.marks_value !== null && entry?.marks_value !== undefined
+                                    ? String(entry.marks_value)
+                                    : ''
+                                }
+                                placeholder="-"
+                                onFocus={() => setFocusCell({ row: rowIdx, col: currentCol })}
+                                onChange={(e) =>
+                                  handleCellChange(
+                                    student.enrollment_id,
+                                    group.subject.id,
+                                    comp.id,
+                                    e.target.value
+                                  )
+                                }
+                                onKeyDown={(e) => handleKeyDown(e, rowIdx, currentCol)}
+                              />
+                            )}
+                          </td>
+                        );
+                      })
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
+
+      {/* Status Bar */}
+      <Card>
+        <CardContent className="p-3">
+          <div className="flex items-center gap-6 text-sm text-gray-500">
+            <span><strong>{gridData.students.length}</strong> students</span>
+            <span><strong>{columnGroups.length}</strong> subjects</span>
+            <span><strong>{columnGroups.reduce((acc, g) => acc + g.components.length, 0)}</strong> components</span>
+            <span><strong>{totalCells}</strong> cells</span>
+            <span><strong className={filledCells === totalCells ? 'text-green-600' : 'text-amber-600'}>{filledCells}</strong> filled</span>
+            <span><strong className="text-gray-400">{totalCells - filledCells}</strong> empty</span>
+            <span>Tip: Press Enter to go down, Tab to go right, type "ABS" for absent</span>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

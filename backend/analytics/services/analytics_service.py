@@ -12,7 +12,7 @@ from django.db.models.functions import Round
 from shared.base_service import BaseService
 from results.models import SubjectResult, MarksEntry
 from enrollments.models import Enrollment, Student
-from academics.models import AcademicSession, Class, Subject, GradePolicy
+from academics.models import AcademicSession, Class, Subject, GradeScale
 
 logger = structlog.get_logger(__name__)
 
@@ -22,17 +22,19 @@ class AnalyticsService(BaseService):
 
     def get_pass_fail_ratio(self, session_id: UUID, class_id: UUID = None) -> dict:
         """Get pass/fail ratio for a session, optionally filtered by class."""
-        from academics.models import GradePolicy
+        from academics.models import GradeScale, GradeRule
 
         qs = SubjectResult.objects.filter(enrollment__session_id=session_id)
         if class_id:
             qs = qs.filter(enrollment__class_field_id=class_id)
 
-        # Determine pass mark from grade policy
+        # Determine pass mark from grade scale
         pass_mark_pct = 33.0  # default
-        gp = GradePolicy.objects.filter(session_id=session_id).first()
-        if gp:
-            pass_mark_pct = float(gp.min_percentage)
+        scale = GradeScale.objects.filter(session_id=session_id, is_active=True).first()
+        if scale:
+            rule = scale.rules.order_by("display_order").first()
+            if rule:
+                pass_mark_pct = float(rule.min_percentage)
 
         total = qs.values("enrollment_id").distinct().count()
         # A student passes if all their subjects are above pass mark

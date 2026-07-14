@@ -12,6 +12,7 @@ from results.api.publication_views import (
     ResultPublicationUnpublishView,
     ResultPublicationSummaryView,
 )
+from results.api.marks_grid_views import MarksEntryGridView, MarksEntryCellView
 
 router = DefaultRouter()
 router.register(r"marks-entries", MarksEntryViewSet, basename="marks-entries")
@@ -19,6 +20,9 @@ router.register(r"subject-results", SubjectResultViewSet, basename="subject-resu
 
 urlpatterns = [
     path("", include(router.urls)),
+    # ── New aggregate marks entry endpoints ──
+    path("marks-entry/<uuid:session_id>/<uuid:class_id>/", MarksEntryGridView.as_view(), name="marks-entry-grid"),
+    path("marks-entry/<uuid:session_id>/<uuid:class_id>/cell/", MarksEntryCellView.as_view(), name="marks-entry-cell"),
     # Publication endpoints
     path("publications/", ResultPublicationListView.as_view(), name="publication-list"),
     path("publications/summary/", ResultPublicationSummaryView.as_view(), name="publication-summary"),

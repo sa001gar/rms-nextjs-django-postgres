@@ -1,12 +1,12 @@
 'use client';
 
-import { redirect } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuthStore, useIsHydrated } from '@/stores/auth-store';
-import { clearTokens } from '@/lib/api/client';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
-import { Loading } from '@/components/ui/loading';
-import { LayoutDashboard, FileText, Award, User, BarChart3 } from 'lucide-react';
+import { SplashScreen } from '@/components/ui/splash-screen';
+import { LayoutDashboard, FileText, Award, User } from 'lucide-react';
 
 const navItems = [
   { title: 'Dashboard', href: '/student', icon: LayoutDashboard },
@@ -16,16 +16,22 @@ const navItems = [
 ];
 
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const { student, isAuthenticated } = useAuthStore();
   const isHydrated = useIsHydrated();
+  const [redirecting, setRedirecting] = useState(false);
 
-  if (!isHydrated) {
-    return <Loading message="Verifying session..." />;
-  }
+  useEffect(() => {
+    if (!isHydrated) return;
+    if (!isAuthenticated && !student) {
+      setRedirecting(true);
+      router.replace('/login/student');
+    }
+  }, [isHydrated, isAuthenticated, student, router]);
 
-  if (!isAuthenticated && !student) {
-    redirect('/login/student');
-  }
+  if (!isHydrated || redirecting) return <SplashScreen role="student" message="Verifying session..." />;
+
+  if (!isAuthenticated && !student) return <SplashScreen role="student" message="Redirecting..." />;
 
   return (
     <div className="min-h-screen bg-gray-50">

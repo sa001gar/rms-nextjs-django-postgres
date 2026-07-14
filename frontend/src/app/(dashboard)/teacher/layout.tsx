@@ -1,11 +1,11 @@
 'use client';
 
-import { redirect } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuthStore, useIsHydrated } from '@/stores/auth-store';
-import { clearTokens } from '@/lib/api/client';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
-import { Loading } from '@/components/ui/loading';
+import { SplashScreen } from '@/components/ui/splash-screen';
 import { LayoutDashboard, BookOpen, FileText, ClipboardList, Users } from 'lucide-react';
 
 const navItems = [
@@ -17,16 +17,22 @@ const navItems = [
 ];
 
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
   const isHydrated = useIsHydrated();
+  const [redirecting, setRedirecting] = useState(false);
 
-  if (!isHydrated) {
-    return <Loading message="Verifying session..." />;
-  }
+  useEffect(() => {
+    if (!isHydrated) return;
+    if (!isAuthenticated || (user?.role !== 'teacher' && user?.role !== 'admin')) {
+      setRedirecting(true);
+      router.replace('/login/teacher');
+    }
+  }, [isHydrated, isAuthenticated, user, router]);
 
-  if (!isAuthenticated || (user?.role !== 'teacher' && user?.role !== 'admin')) {
-    redirect('/login/teacher');
-  }
+  if (!isHydrated || redirecting) return <SplashScreen role="teacher" message="Verifying session..." />;
+
+  if (!isAuthenticated || (user?.role !== 'teacher' && user?.role !== 'admin')) return <SplashScreen role="teacher" message="Redirecting..." />;
 
   return (
     <div className="min-h-screen bg-gray-50">

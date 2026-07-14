@@ -1,15 +1,5 @@
-import { Skeleton } from '@/components/ui/skeleton';
+import { SplashScreen } from '@/components/ui/splash-screen';
 
 export default function StudentLoading() {
-  return (
-    <div className="space-y-6">
-      <Skeleton className="h-8 w-48" />
-      <div className="grid gap-4 sm:grid-cols-2">
-        {Array.from({ length: 2 }).map((_, i) => (
-          <Skeleton key={i} className="h-28 rounded-lg" />
-        ))}
-      </div>
-      <Skeleton className="h-64 rounded-lg" />
-    </div>
-  );
+  return <SplashScreen role="student" message="Loading dashboard..." />;
 }

@@ -138,8 +138,8 @@ class Command(BaseCommand):
                 )
 
         # Create grade policy set
-        from academics.models import GradePolicySet, GradePolicyGrade
-        policy_set, _ = GradePolicySet.objects.get_or_create(
+        from academics.models import GradeScale, GradeRule
+        policy_set, _ = GradeScale.objects.get_or_create(
             session=session, name="Default",
             defaults={"is_active": True},
         )
@@ -153,8 +153,8 @@ class Command(BaseCommand):
             ("D", 0, 19.99, 2.0, 7),
         ]
         for label, min_p, max_p, gp, order in grades:
-            GradePolicyGrade.objects.get_or_create(
-                grade_policy_set=policy_set, grade_label=label,
+            GradeRule.objects.get_or_create(
+                grade_scale=policy_set, label=label,
                 defaults={
                     "min_percentage": min_p, "max_percentage": max_p,
                     "grade_point": gp, "display_order": order,

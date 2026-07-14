@@ -71,6 +71,29 @@ class SubjectCategory(BaseModel):
         return self.name
 
 
+class SubjectGroup(BaseModel):
+    """Grouping layer between SubjectCategory and Subject.
+
+    Scholastic → Languages → English, Bengali
+    Scholastic → Sciences → Physics, Chemistry
+    Co-Scholastic → Activities → Games, Art
+    """
+
+    name = models.CharField(max_length=100)
+    code = models.CharField(max_length=30, unique=True)
+    category = models.ForeignKey(
+        SubjectCategory, on_delete=models.CASCADE, related_name="groups"
+    )
+    display_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        db_table = "subject_groups"
+        ordering = ["category", "display_order"]
+
+    def __str__(self) -> str:
+        return f"{self.category.name} → {self.name}"
+
+
 class Subject(BaseModel):
     """Subject master."""
 
@@ -78,6 +101,13 @@ class Subject(BaseModel):
     code = models.CharField(max_length=20, unique=True)
     subject_category = models.ForeignKey(
         SubjectCategory,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="subjects",
+    )
+    group = models.ForeignKey(
+        SubjectGroup,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -95,14 +125,6 @@ class Subject(BaseModel):
 class ClassSubject(BaseModel):
     """Mapping of subjects assigned to a class with optional grouping."""
 
-    SUBJECT_GROUP_CHOICES = [
-        ("core", "Core"),
-        ("elective", "Elective"),
-        ("language", "Language"),
-        ("vocational", "Vocational"),
-        ("co_scholastic", "Co-Scholastic"),
-    ]
-
     class_ref = models.ForeignKey(
         Class, on_delete=models.CASCADE, related_name="class_subjects", db_column="class_id"
     )
@@ -110,12 +132,18 @@ class ClassSubject(BaseModel):
         Subject, on_delete=models.CASCADE, related_name="class_subjects"
     )
     is_required = models.BooleanField(default=True)
-    subject_group = models.CharField(
-        max_length=30, choices=SUBJECT_GROUP_CHOICES, default="core"
+    group = models.ForeignKey(
+        SubjectGroup,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="class_subjects",
     )
+    display_order = models.PositiveIntegerField(default=0)
 
     class Meta:
         db_table = "class_subjects"
+        ordering = ["class_ref", "display_order"]
         unique_together = [("class_ref", "subject")]
 
     def __str__(self) -> str:
@@ -204,62 +232,81 @@ class ExamComponent(BaseModel):
         return f"{prefix}{parent_prefix}{self.name}{marks}{vtype}"
 
 
-class SubjectAssessmentScheme(BaseModel):
-    """Configures how a subject is assessed for a class in a given session.
+class AssessmentComponentConfig(BaseModel):
+    """Maps an assessment component to a class-subject with overridable marks/weightage.
 
-    Maps which ExamComponents apply to a given class+subject+session with
-    overridable full_marks and weightage.
+    This is the core of the configuration matrix. For each (class, subject, component),
+    defines full_marks, weightage, and whether the component applies.
     """
 
     class_ref = models.ForeignKey(
-        Class, on_delete=models.CASCADE, related_name="assessment_schemes", db_column="class_id"
+        Class, on_delete=models.CASCADE, related_name="component_configs", db_column="class_id"
     )
     subject = models.ForeignKey(
-        Subject, on_delete=models.CASCADE, related_name="assessment_schemes"
+        Subject, on_delete=models.CASCADE, related_name="component_configs"
+    )
+    assessment_component = models.ForeignKey(
+        ExamComponent, on_delete=models.CASCADE, related_name="class_configs"
     )
     session = models.ForeignKey(
-        AcademicSession, on_delete=models.CASCADE, related_name="assessment_schemes",
+        AcademicSession, on_delete=models.CASCADE, related_name="component_configs",
         help_text="Session-scoped so historical report cards remain valid"
-    )
-    exam_component = models.ForeignKey(
-        ExamComponent, on_delete=models.CASCADE, related_name="assessment_schemes"
     )
     full_marks = models.DecimalField(
         max_digits=6, decimal_places=2,
-        help_text="Override ExamComponent.full_marks per class-subject-session"
+        help_text="Override component full_marks per class-subject-session"
     )
     weightage_pct = models.DecimalField(max_digits=5, decimal_places=2, default=100.00)
-    is_active = models.BooleanField(default=True)
+    is_applicable = models.BooleanField(default=True)
     display_order = models.PositiveIntegerField(default=0)
 
     class Meta:
-        db_table = "subject_assessment_schemes"
-        ordering = ["class_ref__level", "subject__code", "display_order"]
-        unique_together = [("class_ref", "subject", "session", "exam_component")]
+        db_table = "assessment_component_configs"
+        unique_together = [("class_ref", "subject", "session", "assessment_component")]
 
     def __str__(self) -> str:
         return (
             f"{self.class_ref.name} {self.subject.name} "
-            f"[{self.session.name}] - {self.exam_component.name}"
+            f"[{self.session.name}] - {self.assessment_component.name}"
         )
 
 
-class GradePolicySet(BaseModel):
+class GradeScale(BaseModel):
     """Named grading scheme scoped to a session."""
 
     session = models.ForeignKey(
         AcademicSession, on_delete=models.CASCADE, null=True, blank=True,
-        related_name="grade_policy_sets"
+        related_name="grade_scales"
     )
     name = models.CharField(max_length=100, default="Default")
     is_active = models.BooleanField(default=True)
 
     class Meta:
-        db_table = "grade_policy_sets"
+        db_table = "grade_scales"
         unique_together = [("session", "name")]
 
     def __str__(self) -> str:
         return f"{self.name} ({self.session.name if self.session else 'Global'})"
+
+
+class GradeRule(BaseModel):
+    """Single grade row within a GradeScale."""
+
+    grade_scale = models.ForeignKey(
+        GradeScale, on_delete=models.CASCADE, related_name="rules"
+    )
+    label = models.CharField(max_length=10)
+    min_percentage = models.DecimalField(max_digits=5, decimal_places=2)
+    max_percentage = models.DecimalField(max_digits=5, decimal_places=2)
+    grade_point = models.DecimalField(max_digits=3, decimal_places=1)
+    display_order = models.PositiveIntegerField()
+
+    class Meta:
+        db_table = "grade_rules"
+        ordering = ["grade_scale", "display_order"]
+
+    def __str__(self) -> str:
+        return f"{self.label} ({self.min_percentage}%-{self.max_percentage}%)"
 
 
 class TeacherAssignment(BaseModel):
@@ -295,26 +342,6 @@ class TeacherAssignment(BaseModel):
             f"{self.teacher.name} -> {self.class_ref.name} "
             f"{self.section.name} {self.subject.name}"
         )
-
-
-class GradePolicyGrade(BaseModel):
-    """Individual grade row within a GradePolicySet."""
-
-    grade_policy_set = models.ForeignKey(
-        GradePolicySet, on_delete=models.CASCADE, related_name="grades"
-    )
-    grade_label = models.CharField(max_length=10)
-    min_percentage = models.DecimalField(max_digits=5, decimal_places=2)
-    max_percentage = models.DecimalField(max_digits=5, decimal_places=2)
-    grade_point = models.DecimalField(max_digits=3, decimal_places=1)
-    display_order = models.PositiveIntegerField()
-
-    class Meta:
-        db_table = "grade_policy_grades"
-        ordering = ["grade_policy_set", "display_order"]
-
-    def __str__(self) -> str:
-        return f"{self.grade_label} ({self.min_percentage}%-{self.max_percentage}%)"
 
 
 class PromotionRule(BaseModel):
@@ -446,68 +473,4 @@ class ReportCardSectionSubjectGroup(BaseModel):
         return f"{self.section} - {self.subject_category.name if self.subject_category else 'None'}"
 
 
-# ════════════════════════════════════════════════════════════════
-# DEPRECATED MODELS — kept for migration compatibility only.
-# These tables will be removed in a future migration after all
-# data has been migrated to the new schema.
-# ════════════════════════════════════════════════════════════════
 
-class ExamComponentMapping(BaseModel):
-    """DEPRECATED — renamed to SubjectAssessmentScheme."""
-    class_ref = models.ForeignKey(Class, on_delete=models.CASCADE, related_name="exam_component_mappings+", db_column="class_id")
-    subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name="exam_component_mappings+")
-    exam_component = models.ForeignKey(ExamComponent, on_delete=models.CASCADE, related_name="class_subject_mappings+")
-    full_marks = models.DecimalField(max_digits=6, decimal_places=2)
-    weightage_pct = models.DecimalField(max_digits=5, decimal_places=2, default=100.00)
-    is_active = models.BooleanField(default=True)
-    display_order = models.PositiveIntegerField(default=0)
-    class Meta: db_table = "exam_component_mappings"; ordering = ["class_ref__level", "subject__code", "display_order"]
-    def __str__(self) -> str: return f"{self.class_ref} {self.subject} - {self.exam_component}"
-
-
-class AssessmentType(BaseModel):
-    """DEPRECATED — Use Exam + ExamComponent instead."""
-    CATEGORY_CHOICES = [
-        ("summative", "Summative"), ("formative", "Formative"),
-        ("project", "Project"), ("practical", "Practical"), ("other", "Other"),
-    ]
-    name = models.CharField(max_length=100)
-    code = models.CharField(max_length=30, unique=True)
-    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default="summative")
-    term = models.ForeignKey("Term", on_delete=models.SET_NULL, null=True, blank=True, related_name="assessment_types")
-    display_order = models.PositiveIntegerField(default=0)
-    is_active = models.BooleanField(default=True)
-    class Meta: db_table = "assessment_types"; ordering = ["display_order"]
-    def __str__(self) -> str: return self.name
-
-
-class AssessmentWeightage(BaseModel):
-    """DEPRECATED — Use SubjectAssessmentScheme instead."""
-    class_ref = models.ForeignKey(Class, on_delete=models.CASCADE, related_name="assessment_weightages+", db_column="class_id")
-    subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name="assessment_weightages+")
-    assessment_type = models.ForeignKey(AssessmentType, on_delete=models.CASCADE, related_name="weightages+")
-    full_marks = models.PositiveIntegerField()
-    weightage_pct = models.DecimalField(max_digits=5, decimal_places=2)
-    class Meta: db_table = "assessment_weightages"; unique_together = [("class_ref", "subject", "assessment_type")]
-    def __str__(self) -> str: return f"{self.class_ref} - {self.subject} - {self.assessment_type}"
-
-
-class MarksDistribution(BaseModel):
-    """DEPRECATED — Use SubjectAssessmentScheme instead."""
-    class_ref = models.ForeignKey(Class, on_delete=models.CASCADE, related_name="marks_distributions+", db_column="class_id")
-    assessment_type = models.ForeignKey(AssessmentType, on_delete=models.CASCADE, related_name="marks_distributions+")
-    full_marks = models.PositiveIntegerField(default=0)
-    class Meta: db_table = "marks_distributions"; unique_together = [("class_ref", "assessment_type")]
-    def __str__(self) -> str: return f"{self.class_ref} - {self.assessment_type}: {self.full_marks}"
-
-
-class GradePolicy(BaseModel):
-    """DEPRECATED — Use GradePolicySet + GradePolicyGrade instead."""
-    grade_label = models.CharField(max_length=10, unique=True)
-    min_percentage = models.DecimalField(max_digits=5, decimal_places=2)
-    max_percentage = models.DecimalField(max_digits=5, decimal_places=2)
-    grade_point = models.DecimalField(max_digits=3, decimal_places=1)
-    display_order = models.PositiveIntegerField(unique=True)
-    is_active = models.BooleanField(default=True)
-    class Meta: db_table = "grade_policies"; ordering = ["display_order"]
-    def __str__(self) -> str: return f"{self.grade_label} ({self.min_percentage}%-{self.max_percentage}%)"

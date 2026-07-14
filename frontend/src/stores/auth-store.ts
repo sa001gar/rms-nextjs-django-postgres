@@ -142,8 +142,14 @@ export const useAuthStore = create<AuthState>()(
         student: state.student,
         isAuthenticated: state.isAuthenticated,
       }),
-      onRehydrateStorage: () => (state) => {
-        if (state) state.setHydrated();
+      onRehydrateStorage: () => (state, error) => {
+        if (!error) {
+          useAuthStore.setState({ isHydrated: true, isLoading: false });
+        }
+        setTimeout(() => {
+          const s = useAuthStore.getState();
+          if (!s.isHydrated) useAuthStore.setState({ isHydrated: true, isLoading: false });
+        }, 3000);
       },
     }
   )

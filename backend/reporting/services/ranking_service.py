@@ -89,7 +89,6 @@ class RankingService(BaseService):
     ) -> dict:
         """Get a specific student's rank, percentage, and grade within their current class."""
         from enrollments.models import Enrollment
-        from academics.models import GradePolicy
         from academics.services.grading_service import GradingService
 
         enrollment = Enrollment.objects.filter(

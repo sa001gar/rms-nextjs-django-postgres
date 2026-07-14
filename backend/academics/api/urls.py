@@ -10,9 +10,9 @@ from academics.api.views import (
     TeacherAssignmentViewSet,
     ExamViewSet,
     ExamComponentViewSet,
-    SubjectAssessmentSchemeViewSet,
-    GradePolicySetViewSet,
-    GradePolicyGradeViewSet,
+    AssessmentComponentConfigViewSet,
+    GradeScaleViewSet,
+    GradeRuleViewSet,
     PromotionRuleViewSet,
     ReportCardTemplateViewSet,
     TermViewSet,
@@ -20,8 +20,8 @@ from academics.api.views import (
     ReportCardSectionViewSet,
     ReportCardSectionSubjectGroupViewSet,
     ReportCardTemplateAssignmentViewSet,
-    MarksDistributionViewSet,
 )
+from academics.api.config_views import ResultConfigView, SubjectGroupListView
 
 router = DefaultRouter()
 router.register(r"sessions", AcademicSessionViewSet, basename="sessions")
@@ -32,9 +32,9 @@ router.register(r"subject-categories", SubjectCategoryViewSet, basename="subject
 router.register(r"teacher-assignments", TeacherAssignmentViewSet, basename="teacher-assignments")
 router.register(r"exams", ExamViewSet, basename="exams")
 router.register(r"exam-components", ExamComponentViewSet, basename="exam-components")
-router.register(r"subject-assessment-schemes", SubjectAssessmentSchemeViewSet, basename="subject-assessment-schemes")
-router.register(r"grade-policy-sets", GradePolicySetViewSet, basename="grade-policy-sets")
-router.register(r"grade-policy-grades", GradePolicyGradeViewSet, basename="grade-policy-grades")
+router.register(r"assessment-component-configs", AssessmentComponentConfigViewSet, basename="assessment-component-configs")
+router.register(r"grade-scales", GradeScaleViewSet, basename="grade-scales")
+router.register(r"grade-rules", GradeRuleViewSet, basename="grade-rules")
 router.register(r"promotion-rules", PromotionRuleViewSet, basename="promotion-rules")
 router.register(r"report-card-templates", ReportCardTemplateViewSet, basename="report-card-templates")
 router.register(r"report-card-sections", ReportCardSectionViewSet, basename="report-card-sections")
@@ -43,5 +43,7 @@ router.register(r"report-card-template-assignments", ReportCardTemplateAssignmen
 
 urlpatterns = [
     path("", include(router.urls)),
-    path("marks-distribution/", MarksDistributionViewSet.as_view({"get": "list", "post": "bulk_save"})),
+    # ── New aggregate endpoints ──
+    path("result-config/<uuid:session_id>/<uuid:class_id>/", ResultConfigView.as_view(), name="result-config"),
+    path("subject-groups/", SubjectGroupListView.as_view(), name="subject-groups"),
 ]

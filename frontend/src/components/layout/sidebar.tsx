@@ -3,14 +3,16 @@
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronLeft, ChevronDown, Menu } from "lucide-react";
+import { ChevronLeft, Menu } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
 export interface NavItem {
-  href: string;
-  title: string;
-  icon: React.ComponentType<{ className?: string }>;
+  href?: string;
+  title?: string;
+  icon?: React.ComponentType<{ className?: string }>;
+  section?: string;
+  items?: NavItem[];
 }
 
 interface SidebarProps {
@@ -19,10 +21,38 @@ interface SidebarProps {
   color: string;
 }
 
+function isGroupItem(item: NavItem): boolean {
+  return !!item.section && !!item.items;
+}
+
 export function Sidebar({ items, title, color }: SidebarProps) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const renderNavItem = (item: NavItem, isNested?: boolean) => {
+    if (!item.href || !item.title || !item.icon) return null;
+    const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+    const Icon = item.icon;
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        className={cn(
+          "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
+          collapsed && !isNested && "justify-center",
+          isActive
+            ? "bg-amber-500 text-white shadow-md"
+            : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+        )}
+        onClick={() => setMobileOpen(false)}
+        title={collapsed ? item.title : undefined}
+      >
+        <Icon className="h-5 w-5 shrink-0" />
+        {(!collapsed || isNested) && <span>{item.title}</span>}
+      </Link>
+    );
+  };
 
   return (
     <>
@@ -51,26 +81,21 @@ export function Sidebar({ items, title, color }: SidebarProps) {
         </div>
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
           {items.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
-                  collapsed && "justify-center",
-                  isActive
-                    ? "bg-amber-500 text-white shadow-md"
-                    : "text-gray-700 hover:bg-gray-100"
-                )}
-                onClick={() => setMobileOpen(false)}
-                title={collapsed ? item.title : undefined}
-              >
-                <Icon className="h-5 w-5 shrink-0" />
-                {!collapsed && <span>{item.title}</span>}
-              </Link>
-            );
+            if (isGroupItem(item)) {
+              return (
+                <div key={item.section} className={collapsed ? "flex flex-col items-center py-2" : "py-2"}>
+                  {!collapsed && (
+                    <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                      {item.section}
+                    </p>
+                  )}
+                  <div className={collapsed ? "flex flex-col items-center gap-1" : "space-y-0.5"}>
+                    {item.items!.map((sub) => renderNavItem(sub, collapsed))}
+                  </div>
+                </div>
+              );
+            }
+            return renderNavItem(item);
           })}
         </nav>
       </aside>

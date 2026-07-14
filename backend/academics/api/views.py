@@ -26,11 +26,13 @@ from academics.api.serializers import (
     ExamSerializer,
     ExamComponentInputSerializer,
     ExamComponentSerializer,
-    SubjectAssessmentSchemeInputSerializer,
-    SubjectAssessmentSchemeSerializer,
-    BulkSubjectAssessmentSchemeSerializer,
-    GradePolicySetInputSerializer,
-    GradePolicySetSerializer,
+    AssessmentComponentConfigInputSerializer,
+    AssessmentComponentConfigSerializer,
+    BulkAssessmentComponentConfigSerializer,
+    GradeScaleInputSerializer,
+    GradeScaleSerializer,
+    GradeRuleSerializer,
+    GradeRuleInputSerializer,
     PromotionRuleInputSerializer,
     PromotionRuleSerializer,
     TermSerializer,
@@ -361,15 +363,15 @@ class ExamComponentViewSet(viewsets.ViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class SubjectAssessmentSchemeViewSet(viewsets.ViewSet):
+class AssessmentComponentConfigViewSet(viewsets.ViewSet):
     permission_classes = [IsAdmin]
 
     def list(self, request):
-        from academics.models import SubjectAssessmentScheme
+        from academics.models import AssessmentComponentConfig
         class_id = request.query_params.get("class_id")
         subject_id = request.query_params.get("subject_id")
-        qs = SubjectAssessmentScheme.objects.select_related(
-            "class_ref", "subject", "exam_component"
+        qs = AssessmentComponentConfig.objects.select_related(
+            "class_ref", "subject", "assessment_component"
         )
         if class_id:
             qs = qs.filter(class_ref_id=class_id)
@@ -377,16 +379,16 @@ class SubjectAssessmentSchemeViewSet(viewsets.ViewSet):
             qs = qs.filter(subject_id=subject_id)
         data = []
         for m in qs:
-            d = SubjectAssessmentSchemeSerializer(m).data
+            d = AssessmentComponentConfigSerializer(m).data
             d["class_name"] = m.class_ref.name
             d["subject_name"] = m.subject.name
-            d["exam_component_name"] = m.exam_component.name
+            d["exam_component_name"] = m.assessment_component.name
             data.append(d)
         return Response(data)
 
     @action(detail=False, methods=["post"], url_path="bulk-save")
     def bulk_save(self, request):
-        from academics.models import SubjectAssessmentScheme
+        from academics.models import AssessmentComponentConfig
         from django.db import transaction
 
         mappings = request.data.get("mappings", [])
@@ -397,94 +399,94 @@ class SubjectAssessmentSchemeViewSet(viewsets.ViewSet):
         results = []
         with transaction.atomic():
             for i, entry in enumerate(mappings):
-                serializer = SubjectAssessmentSchemeInputSerializer(data=entry)
+                serializer = AssessmentComponentConfigInputSerializer(data=entry)
                 if not serializer.is_valid():
                     errors.append({"index": i, "errors": serializer.errors})
                     continue
-                obj, _ = SubjectAssessmentScheme.objects.update_or_create(
+                obj, _ = AssessmentComponentConfig.objects.update_or_create(
                     class_ref_id=entry["class_id"],
                     subject_id=entry["subject_id"],
-                    exam_component_id=entry["exam_component_id"],
+                    assessment_component_id=entry["assessment_component_id"],
                     defaults={
                         "full_marks": entry.get("full_marks", 0),
                         "weightage_pct": entry.get("weightage_pct", 100.00),
-                        "is_active": entry.get("is_active", True),
+                        "is_applicable": entry.get("is_applicable", True),
                         "display_order": entry.get("display_order", 0),
                     },
                 )
-                results.append(SubjectAssessmentSchemeSerializer(obj).data)
+                results.append(AssessmentComponentConfigSerializer(obj).data)
 
         if errors:
             return Response({"results": results, "errors": errors}, status=status.HTTP_207_MULTI_STATUS)
         return Response(results, status=status.HTTP_200_OK)
 
 
-class GradePolicySetViewSet(viewsets.ViewSet):
+class GradeScaleViewSet(viewsets.ViewSet):
     permission_classes = [IsAdmin]
 
     def list(self, request):
-        from academics.models import GradePolicySet, GradePolicyGrade
+        from academics.models import GradeScale, GradeRule
         session_id = request.query_params.get("session_id")
-        qs = GradePolicySet.objects.all()
+        qs = GradeScale.objects.all()
         if session_id:
             qs = qs.filter(session_id=session_id)
-        qs = qs.prefetch_related("grades")
+        qs = qs.prefetch_related("rules")
         data = []
-        for ps in qs:
-            d = GradePolicySetSerializer(ps).data
-            d["grades"] = [GradePolicyGradeSerializer(g).data for g in ps.grades.all()]
+        for scale in qs:
+            d = GradeScaleSerializer(scale).data
+            d["grades"] = [GradeRuleSerializer(g).data for g in scale.rules.all()]
             data.append(d)
         return Response(data)
 
     def create(self, request):
-        from academics.models import GradePolicySet, GradePolicyGrade
-        serializer = GradePolicySetInputSerializer(data=request.data)
+        from academics.models import GradeScale, GradeRule
+        serializer = GradeScaleInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         grades_data = serializer.validated_data.pop("grades", [])
-        ps = GradePolicySet.objects.create(**serializer.validated_data)
+        scale = GradeScale.objects.create(**serializer.validated_data)
         for g in grades_data:
-            GradePolicyGrade.objects.create(grade_policy_set=ps, **g)
-        ps.refresh_from_db()
-        d = GradePolicySetSerializer(ps).data
-        d["grades"] = [GradePolicyGradeSerializer(g).data for g in ps.grades.all()]
+            GradeRule.objects.create(grade_scale=scale, **g)
+        scale.refresh_from_db()
+        d = GradeScaleSerializer(scale).data
+        d["grades"] = [GradeRuleSerializer(g).data for g in scale.rules.all()]
         return Response(d, status=status.HTTP_201_CREATED)
 
     def destroy(self, request, pk=None):
-        from academics.models import GradePolicySet
-        GradePolicySet.objects.filter(pk=pk).delete()
+        from academics.models import GradeScale
+        GradeScale.objects.filter(pk=pk).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class GradePolicyGradeViewSet(viewsets.ViewSet):
+class GradeRuleViewSet(viewsets.ViewSet):
     permission_classes = [IsAdmin]
 
     def list(self, request):
-        from academics.models import GradePolicyGrade
-        policy_set_id = request.query_params.get("policy_set_id")
-        qs = GradePolicyGrade.objects.all()
-        if policy_set_id:
-            qs = qs.filter(grade_policy_set_id=policy_set_id)
-        data = [GradePolicyGradeSerializer(g).data for g in qs]
+        from academics.models import GradeRule
+        scale_id = request.query_params.get("scale_id")
+        qs = GradeRule.objects.all()
+        if scale_id:
+            qs = qs.filter(grade_scale_id=scale_id)
+        data = [GradeRuleSerializer(g).data for g in qs]
         return Response(data)
 
     def create(self, request):
-        from academics.models import GradePolicyGrade
-        serializer = GradePolicyGradeInputSerializer(data=request.data)
+        from academics.models import GradeRule
+        serializer = GradeRuleInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        obj = GradePolicyGrade.objects.create(**serializer.validated_data)
-        return Response(GradePolicyGradeSerializer(obj).data, status=status.HTTP_201_CREATED)
+        obj = GradeRule.objects.create(**serializer.validated_data)
+        return Response(GradeRuleSerializer(obj).data, status=status.HTTP_201_CREATED)
 
     def update(self, request, pk=None):
-        from academics.models import GradePolicyGrade
-        serializer = GradePolicyGradeInputSerializer(data=request.data)
+        from academics.models import GradeRule
+        serializer = GradeRuleInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        GradePolicyGrade.objects.filter(pk=pk).update(**serializer.validated_data)
-        obj = GradePolicyGrade.objects.get(pk=pk)
-        return Response(GradePolicyGradeSerializer(obj).data)
+        GradeRule.objects.filter(pk=pk).update(**serializer.validated_data)
+        obj = GradeRule.objects.get(pk=pk)
+        return Response(GradeRuleSerializer(obj).data)
 
     def destroy(self, request, pk=None):
-        from academics.models import GradePolicyGrade
-        GradePolicyGrade.objects.filter(pk=pk).delete()
+        from academics.models import GradeRule
+        GradeRule.objects.filter(pk=pk).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -704,59 +706,5 @@ class TeacherAssignmentViewSet(viewsets.ViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class MarksDistributionViewSet(viewsets.ViewSet):
-    """Class-level marks distribution per assessment type."""
-    permission_classes = [IsAdmin]
 
-    def list(self, request):
-        from academics.models import MarksDistribution
-        qs = MarksDistribution.objects.select_related("class_ref", "assessment_type").all()
-        data = [
-            {
-                "id": str(md.id),
-                "class_id": str(md.class_ref_id),
-                "class_name": md.class_ref.name,
-                "assessment_type_id": str(md.assessment_type_id),
-                "assessment_type_name": md.assessment_type.name,
-                "full_marks": md.full_marks,
-            }
-            for md in qs
-        ]
-        return Response(data)
-
-    @action(detail=False, methods=["post"], url_path="bulk-save")
-    def bulk_save(self, request):
-        """Bulk upsert marks distribution entries.
-        
-        Expected payload:
-        {
-          "entries": [
-            {"class_id": "...", "assessment_type_id": "...", "full_marks": 40},
-            ...
-          ]
-        }
-        """
-        from academics.models import MarksDistribution
-        from django.db import transaction
-
-        entries = request.data.get("entries", [])
-        if not entries:
-            return Response({"detail": "No entries provided."}, status=status.HTTP_400_BAD_REQUEST)
-
-        results = []
-        with transaction.atomic():
-            for entry in entries:
-                obj, _ = MarksDistribution.objects.update_or_create(
-                    class_ref_id=entry["class_id"],
-                    assessment_type_id=entry["assessment_type_id"],
-                    defaults={"full_marks": entry.get("full_marks", 0)},
-                )
-                results.append({
-                    "id": str(obj.id),
-                    "class_id": str(obj.class_ref_id),
-                    "assessment_type_id": str(obj.assessment_type_id),
-                    "full_marks": obj.full_marks,
-                })
-
-        return Response(results, status=status.HTTP_200_OK)
 

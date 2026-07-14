@@ -149,69 +149,69 @@ class ExamComponentInputSerializer(serializers.Serializer):
 
 
 # ──────────────────────────────────────────────
-# SubjectAssessmentScheme (marks distribution)
+# AssessmentComponentConfig (marks distribution)
 # ──────────────────────────────────────────────
-class SubjectAssessmentSchemeSerializer(serializers.Serializer):
+class AssessmentComponentConfigSerializer(serializers.Serializer):
     id = serializers.UUIDField(read_only=True)
     class_id = serializers.UUIDField()
     subject_id = serializers.UUIDField()
-    exam_component_id = serializers.UUIDField()
+    assessment_component_id = serializers.UUIDField()
     full_marks = serializers.DecimalField(max_digits=6, decimal_places=2)
     weightage_pct = serializers.DecimalField(max_digits=5, decimal_places=2, default=100.00)
-    is_active = serializers.BooleanField(default=True)
+    is_applicable = serializers.BooleanField(default=True)
     display_order = serializers.IntegerField(default=0)
     created_at = serializers.DateTimeField(read_only=True)
 
 
-class SubjectAssessmentSchemeInputSerializer(serializers.Serializer):
+class AssessmentComponentConfigInputSerializer(serializers.Serializer):
     class_id = serializers.UUIDField()
     subject_id = serializers.UUIDField()
-    exam_component_id = serializers.UUIDField()
+    assessment_component_id = serializers.UUIDField()
     full_marks = serializers.DecimalField(max_digits=6, decimal_places=2)
     weightage_pct = serializers.DecimalField(max_digits=5, decimal_places=2, default=100.00)
-    is_active = serializers.BooleanField(default=True)
+    is_applicable = serializers.BooleanField(default=True)
     display_order = serializers.IntegerField(default=0)
 
 
-class BulkSubjectAssessmentSchemeSerializer(serializers.Serializer):
+class BulkAssessmentComponentConfigSerializer(serializers.Serializer):
     """Bulk save for the marks distribution matrix grid."""
-    mappings = serializers.ListField(child=SubjectAssessmentSchemeInputSerializer())
+    mappings = serializers.ListField(child=AssessmentComponentConfigInputSerializer())
 
 
 # ──────────────────────────────────────────────
-# GradePolicySet & GradePolicyGrade
+# GradeScale & GradeRule
 # ──────────────────────────────────────────────
-class GradePolicyGradeSerializer(serializers.Serializer):
+class GradeRuleSerializer(serializers.Serializer):
     id = serializers.UUIDField(read_only=True)
-    grade_label = serializers.CharField(max_length=10)
+    label = serializers.CharField(max_length=10)
     min_percentage = serializers.DecimalField(max_digits=5, decimal_places=2)
     max_percentage = serializers.DecimalField(max_digits=5, decimal_places=2)
     grade_point = serializers.DecimalField(max_digits=3, decimal_places=1)
     display_order = serializers.IntegerField()
 
 
-class GradePolicyGradeInputSerializer(serializers.Serializer):
-    grade_label = serializers.CharField(max_length=10)
+class GradeRuleInputSerializer(serializers.Serializer):
+    label = serializers.CharField(max_length=10)
     min_percentage = serializers.DecimalField(max_digits=5, decimal_places=2)
     max_percentage = serializers.DecimalField(max_digits=5, decimal_places=2)
     grade_point = serializers.DecimalField(max_digits=3, decimal_places=1)
     display_order = serializers.IntegerField()
 
 
-class GradePolicySetSerializer(serializers.Serializer):
+class GradeScaleSerializer(serializers.Serializer):
     id = serializers.UUIDField(read_only=True)
     session_id = serializers.UUIDField(allow_null=True, required=False)
     name = serializers.CharField(max_length=100, default="Default")
     is_active = serializers.BooleanField(default=True)
-    grades = GradePolicyGradeSerializer(many=True, read_only=True)
+    rules = GradeRuleSerializer(many=True, read_only=True)
     created_at = serializers.DateTimeField(read_only=True)
 
 
-class GradePolicySetInputSerializer(serializers.Serializer):
+class GradeScaleInputSerializer(serializers.Serializer):
     session_id = serializers.UUIDField(allow_null=True, required=False)
     name = serializers.CharField(max_length=100, default="Default")
     is_active = serializers.BooleanField(default=True)
-    grades = GradePolicyGradeInputSerializer(many=True, required=False)
+    rules = GradeRuleInputSerializer(many=True, required=False)
 
 
 # ──────────────────────────────────────────────
