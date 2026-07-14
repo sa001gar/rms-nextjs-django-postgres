@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useCallback, useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { clearTokens } from "@/lib/auth/session";
@@ -19,6 +19,32 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const store = useAuthStore();
+
+  useEffect(() => {
+    const hydrate = async () => {
+      console.log('[AuthDebug] Before rehydrate, localStorage:', localStorage.getItem('rms-auth-storage'));
+      await useAuthStore.persist.rehydrate();
+      console.log('[AuthDebug] After rehydrate, store state:', useAuthStore.getState());
+      
+      const state = useAuthStore.getState();
+      const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('access_token');
+      console.log('[AuthDebug] hasToken:', hasToken, 'user:', state.user);
+      
+      if (hasToken && !state.user && !state.student) {
+        try {
+          console.log('[AuthDebug] Fetching current user...');
+          await state.fetchCurrentUser();
+          console.log('[AuthDebug] Fetch success, store state:', useAuthStore.getState());
+        } catch (e) {
+          console.error('[AuthDebug] Fetch failed:', e);
+        }
+      }
+      
+      useAuthStore.setState({ isHydrated: true, isLoading: false });
+      console.log('[AuthDebug] Hydration complete, final store state:', useAuthStore.getState());
+    };
+    hydrate();
+  }, []);
 
   const login = useCallback(async (email: string, password: string, role: UserRole): Promise<boolean> => {
     try {
